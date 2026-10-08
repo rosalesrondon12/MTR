@@ -1,0 +1,2939 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MTR Renamer - Desktop Edition</title>
+    <!-- Estilos de interfaz -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Motor PDF (pdf.js) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <!-- Motor OCR (Tesseract v5: un solo worker reutilizable) -->
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+</head>
+<body class="bg-gray-950 text-gray-100 min-h-screen p-4 sm:p-8 font-sans">
+<div class="max-w-5xl mx-auto space-y-6">
+
+    <!-- Cabecera -->
+    <header class="text-center bg-gray-900 border border-gray-800 rounded-3xl p-6 shadow-2xl">
+        <h1 class="text-3xl sm:text-4xl font-extrabold text-blue-500 mb-2 tracking-tight">MTR Renamer <span class="text-white">PC DESKTOP</span></h1>
+        <p class="text-gray-400 text-sm">Lectura nativa + OCR · Aprende de tus ejemplos · Renombrado seguro (nunca sobrescribe)</p>
+    </header>
+
+    <!-- Avisos del entorno -->
+    <div id="env-errors" class="hidden rounded-2xl border border-red-500/50 bg-red-950/40 p-4 text-sm text-red-200 space-y-1"></div>
+    <div id="env-warnings" class="hidden rounded-2xl border border-amber-500/40 bg-amber-950/30 p-4 text-sm text-amber-200 space-y-1"></div>
+
+    <!-- Selección de carpeta -->
+    <div class="space-y-2">
+    <button id="folder-zone" type="button" class="group block w-full border-2 border-dashed border-gray-700 hover:border-green-500 hover:bg-gray-800/80 rounded-3xl p-8 sm:p-14 text-center transition-all duration-300 shadow-lg disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:border-gray-700 disabled:hover:bg-transparent">
+        <div class="bg-gray-800 group-hover:bg-green-500/20 w-20 h-20 mx-auto rounded-full flex items-center justify-center mb-4 transition-colors">
+            <svg class="h-10 w-10 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path>
+            </svg>
+        </div>
+        <p id="folder-title" class="text-xl sm:text-2xl font-bold text-gray-200">Seleccionar Carpeta de la PC</p>
+        <p class="text-sm text-gray-500 mt-2">El navegador pedirá permiso para leer y renombrar los PDFs de esa carpeta.</p>
+    </button>
+    <div id="resume-bar" class="hidden flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-gray-900 border border-green-600/40 rounded-2xl px-4 py-3">
+        <p class="text-sm text-gray-300 min-w-0 break-words">Última carpeta: <b id="resume-name" class="text-green-300"></b><br><span class="text-xs text-gray-500">El navegador pide tu permiso cada vez que abres la página.</span></p>
+        <button id="resume-btn" type="button" class="bg-green-600 hover:bg-green-500 text-white font-semibold px-4 py-2 rounded-xl text-sm shrink-0">Abrir esa carpeta</button>
+    </div>
+    <label class="flex items-start gap-2 text-xs text-gray-400 cursor-pointer px-2">
+        <input type="checkbox" id="only-new" data-lock class="mt-0.5 w-4 h-4 accent-green-500 shrink-0">
+        <span>Solo los PDFs nuevos del escáner (los que empiezan con <code class="text-gray-300">Premier North Lot_</code>). Los que ya tienen nombre no se tocan.</span>
+    </label>
+    <label class="flex items-start gap-2 text-xs text-gray-400 cursor-pointer px-2">
+        <input type="checkbox" id="watch-new" class="mt-0.5 w-4 h-4 accent-green-500 shrink-0">
+        <span>Vigilar la carpeta: los escaneos que vayan llegando se analizan solos mientras la página esté abierta.</span>
+    </label>
+    </div>
+
+    <!-- Aprendizaje -->
+    <section id="learn-panel" class="bg-gray-900 border border-purple-500/30 rounded-2xl p-5 shadow-lg space-y-3">
+        <div class="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+            <div class="min-w-0">
+                <h2 class="font-bold text-purple-300">🧠 Aprendizaje</h2>
+                <p id="learn-status" class="text-sm text-gray-300 break-words"></p>
+                <p id="learn-sub" class="text-xs text-gray-500 break-words"></p>
+            </div>
+            <div id="learn-actions" class="flex flex-wrap gap-2 shrink-0"></div>
+        </div>
+        <label class="flex items-center gap-2 text-xs text-gray-400 cursor-pointer">
+            <input type="checkbox" id="learn-applied" class="w-4 h-4 accent-purple-500">
+            Aprender también de los nombres que yo apruebe al aplicar (así mejora con el uso)
+        </label>
+        <details class="text-xs text-gray-400">
+            <summary class="cursor-pointer text-gray-300 select-none">¿Cómo se usa?</summary>
+            <ol class="list-decimal ml-5 mt-2 space-y-1">
+                <li>Toca <b>Elegir carpeta de entrenamiento</b> y elige o crea una carpeta aparte (por ejemplo "MTR Entrenamiento"). Se recuerda para las próximas veces, sin importar qué carpeta de MTR estés renombrando.</li>
+                <li>Copia ahí PDFs de ejemplo con el nombre correcto, como <code class="text-gray-300">Channel 10x15.3 Heat 55106319 PO 216054.pdf</code>. También puedes usar subcarpetas con el nombre del tipo (<code class="text-gray-300">Pipe</code>, <code class="text-gray-300">SquareTube</code>…). Tu repositorio de GitHub descargado como ZIP ya sirve tal cual como carpeta de entrenamiento.</li>
+                <li>Pon ejemplos de <b>cada tipo y de cada molino</b>, sobre todo de los que se confunden (Pipe vs SQ Tube). Con 2–3 por caso ya ayuda.</li>
+                <li>Palabras clave: dentro de la carpeta de cada tipo puedes poner un <code class="text-gray-300">palabras-clave.txt</code> con una palabra o frase por renglón (por ejemplo en <code class="text-gray-300">Channel/</code>: <code class="text-gray-300">STRUCTURAL CHANNEL</code>). También sirve <code class="text-gray-300">reglas-tipo.txt</code> en la carpeta principal, con renglones como <code class="text-gray-300">SQ Tube: HSS, SQ TUBE</code>. Esas palabras mandan sobre todo lo demás, así que usa frases que solo salgan en ese material.</li>
+                <li>Lo aprendido se guarda en <code class="text-gray-300">_memoria-mtr.json</code> en esa carpeta; puedes copiar la carpeta a otra PC.</li>
+            </ol>
+        </details>
+    </section>
+
+    <!-- Progreso -->
+    <section id="progress-panel" class="hidden bg-gray-900 border border-blue-500/40 rounded-2xl p-5 space-y-3 shadow-lg">
+        <div class="flex justify-between items-center gap-3">
+            <div class="min-w-0 flex items-center gap-3">
+                <span class="inline-block w-5 h-5 border-2 border-blue-400 border-t-transparent rounded-full animate-spin shrink-0"></span>
+                <div class="min-w-0">
+                    <p id="progress-title" class="font-bold text-blue-400">Analizando…</p>
+                    <p id="progress-file" class="text-xs text-gray-400 font-mono truncate"></p>
+                </div>
+            </div>
+            <button id="cancel-btn" type="button" class="bg-gray-700 hover:bg-red-600 text-white text-xs font-semibold px-3 py-2 rounded-lg transition-colors disabled:opacity-50 shrink-0">Detener</button>
+        </div>
+        <div class="h-2 bg-gray-800 rounded-full overflow-hidden">
+            <div id="progress-bar" class="h-full bg-blue-500 transition-all duration-300" style="width:0%"></div>
+        </div>
+        <p id="progress-sub" class="text-xs text-gray-500 min-h-[1rem]"></p>
+    </section>
+
+    <!-- Resultados -->
+    <section id="results-container" class="hidden space-y-4">
+        <div class="bg-gray-900 p-5 rounded-2xl border border-gray-800 shadow-lg space-y-4">
+            <div class="flex flex-col sm:flex-row justify-between sm:items-center gap-4">
+                <div class="flex items-center gap-3 min-w-0">
+                    <span id="file-count" class="bg-blue-600 text-white text-lg font-bold px-4 py-1.5 rounded-lg">0</span>
+                    <div class="min-w-0">
+                        <h2 class="text-base sm:text-lg font-semibold text-gray-200">PDFs encontrados</h2>
+                        <p class="text-xs text-gray-500 truncate">Carpeta: <span id="folder-name" class="text-gray-300"></span></p>
+                    </div>
+                </div>
+                <div class="flex flex-wrap gap-2">
+                    <button id="rescan-btn" type="button" class="bg-gray-700 hover:bg-gray-600 text-white font-semibold px-4 py-3 rounded-xl text-sm transition-colors disabled:opacity-40 disabled:cursor-not-allowed">↻ Re-escanear</button>
+                    <button id="apply-changes-btn" type="button" class="flex-1 sm:flex-none bg-gradient-to-r from-green-600 to-emerald-500 hover:from-green-500 hover:to-emerald-400 text-white font-bold px-6 py-3 rounded-xl shadow-xl transition-all flex items-center justify-center gap-2 transform hover:scale-105 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:scale-100">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"/></svg>
+                        Aplicar nombres (<span id="apply-count">0</span>)
+                    </button>
+                </div>
+            </div>
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div class="space-y-2 min-w-0">
+                    <div id="stats" class="flex flex-wrap gap-2 text-xs"></div>
+                    <p id="named-info" class="hidden text-xs text-gray-500"></p>
+                    <p id="watch-info" class="hidden text-xs text-green-300/80"></p>
+                </div>
+                <label class="text-xs text-gray-400 flex items-center gap-2 shrink-0">Mostrar
+                    <select id="filter" class="bg-gray-950 border border-gray-700 rounded-lg px-2 py-1 text-gray-200">
+                        <option value="all">Todos</option>
+                        <option value="review">Por revisar</option>
+                        <option value="ok">Listos</option>
+                        <option value="errors">Errores</option>
+                        <option value="done">Renombrados</option>
+                    </select>
+                </label>
+            </div>
+        </div>
+        <div id="empty-msg" class="hidden bg-gray-900 border border-gray-800 rounded-2xl p-8 text-center text-gray-400">No se encontraron PDFs en esta carpeta.</div>
+        <div id="files-list-container" class="grid grid-cols-1 gap-3"></div>
+    </section>
+</div>
+
+<!-- Modal: texto extraído -->
+<div id="debug-modal" class="hidden fixed inset-0 bg-black/80 z-50 items-center justify-center p-4" role="dialog" aria-modal="true">
+    <div class="bg-gray-900 border border-gray-700 rounded-2xl w-full max-w-2xl max-h-[85vh] flex flex-col shadow-2xl">
+        <div class="p-4 border-b border-gray-800 flex justify-between items-start gap-3">
+            <div class="min-w-0">
+                <h3 class="font-bold text-sm sm:text-base text-blue-400">Texto extraído del PDF</h3>
+                <p id="debug-name" class="text-xs text-gray-300 font-mono break-all"></p>
+                <p id="debug-source" class="text-xs text-gray-500"></p>
+            </div>
+            <div class="flex items-center gap-2 shrink-0">
+                <button id="debug-copy" type="button" class="bg-gray-700 hover:bg-gray-600 text-white px-3 py-1.5 rounded-lg text-xs">Copiar</button>
+                <button type="button" data-close-modal class="text-gray-400 hover:text-white font-bold text-2xl px-2" aria-label="Cerrar">&times;</button>
+            </div>
+        </div>
+        <div id="debug-fields" class="px-5 pt-4 space-y-2"></div>
+        <div id="debug-content" class="p-5 overflow-y-auto flex-1 text-xs font-mono text-gray-300 leading-relaxed whitespace-pre-wrap break-words select-text"></div>
+    </div>
+</div>
+
+<!-- Modal: lo aprendido -->
+<div id="learn-modal" class="hidden fixed inset-0 bg-black/80 z-50 items-center justify-center p-4" role="dialog" aria-modal="true">
+    <div class="bg-gray-900 border border-gray-700 rounded-2xl w-full max-w-2xl max-h-[85vh] flex flex-col shadow-2xl">
+        <div class="p-4 border-b border-gray-800 flex justify-between items-center gap-3">
+            <h3 class="font-bold text-sm sm:text-base text-purple-300">🧠 Lo que ha aprendido</h3>
+            <button type="button" data-close-modal class="text-gray-400 hover:text-white font-bold text-2xl px-2" aria-label="Cerrar">&times;</button>
+        </div>
+        <div id="learn-content" class="p-5 overflow-y-auto flex-1 text-sm text-gray-300 space-y-4"></div>
+    </div>
+</div>
+
+<!-- Notificaciones -->
+<div id="toasts" class="fixed bottom-4 right-4 left-4 sm:left-auto z-[60] flex flex-col gap-2 items-end pointer-events-none"></div>
+
+<script>
+'use strict';
+
+/* ============================== CONFIGURACIÓN ============================== */
+const CONFIG = {
+    MAX_NATIVE_PAGES: 3,     // páginas con texto nativo que se revisan (se detiene al encontrar Heat y PO)
+    OCR_DPI: 300,            // resolución del OCR (antes ~180; Tesseract rinde mejor a 300)
+    MAIN_PSM: '3',           // modo de Tesseract para leer el MTR: automático (respeta columnas; lee mejor tus MTR)
+    EXTRA_PSMS: ['6', '11'], // si faltan medidas o tipo: otra lectura "en bloque" y, si aún faltan, una de "texto suelto"
+    STAMP_DPI: 150,          // el sello de Steel & Pipe tiene letra grande: se busca a menor resolución (más rápido)
+    STAMP_PSM: '11',         // modo "texto suelto": encuentra el sello aunque el resto de la hoja esté girado
+    OCR_MAX_SIDE: 3400,      // tope de píxeles por lado: evita imágenes gigantes que tumban la pestaña
+    OCR_RECYCLE_EVERY: 20,   // reinicia el motor OCR cada N lecturas para liberar memoria
+    OCR_IDLE_MS: 60000,      // apaga el OCR tras 1 minuto sin uso
+    OCR_WARN_CONF: 50,       // debajo de esta confianza se marca "baja calidad"
+    OCR_KEEP_CONF: 45,       // palabras que el OCR leyó con menos seguridad se descartan (logos, firmas, manchas)…
+    OCR_KEEP_DIGITS_CONF: 20,// …salvo si tienen números (pueden ser un Heat o un PO): esas se guardan desde aquí
+    MAX_FILE_MB: 150,
+    MAX_TEXT_CHARS: 30000,   // texto guardado por archivo
+    MAX_CONFIRMED: 300,      // ejemplos aprendidos de renombres confirmados
+};
+const PDFJS_WORKER = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+const MEMORY_FILE = '_memoria-mtr.json';
+const RULES_FILE = 'reglas-tipo.txt';
+const RULES_TEMPLATE = `# REGLAS DE TIPO DE MATERIAL (MTR Renamer)
+# Una regla por linea:   Tipo: palabra clave, otra palabra, ...
+# Se revisan de arriba hacia abajo y MANDAN sobre todo lo demas
+# (sobre lo aprendido y sobre las reglas automaticas).
+# No importan mayusculas/minusculas. Las lineas que empiezan con # no cuentan.
+# Quita el # de un ejemplo para activarlo, o escribe las tuyas:
+#
+# SQ Tube: SQUARE TUBE, SQ TUBE, HSS
+# Pipe: SCH 40, SCH 80, NPS
+# Flat: FLAT BAR
+`;
+
+/* CORE-START — lógica pura (sin DOM): lectura de datos, aprendizaje, nombres y renombrado seguro */
+const UNKNOWN = 'UNKNOWN';
+
+// PDFs recién salidos del escáner, todavía sin nombre: "Premier North Lot_20261007_123736.pdf"
+// (el número es la fecha y la hora del escaneo: 2026-10-07 a las 12:37:36)
+const VIRGIN_RE = /^premier[\s_-]*north[\s_-]*lot(?![a-z])/i;
+const isVirginName = n => VIRGIN_RE.test(String(n || ''));
+// Nombres de tipo tal como van en tus archivos (aprendido de tus ejemplos)
+const KNOWN_TYPES = ['SQ Tube', 'Plate', 'Beam', 'Channel', 'Angle', 'Flat Bar', 'Pipe', 'Rebar', 'HR Sheet', 'Floor Plate'];
+// Otras formas de escribir el mismo tipo (en nombres viejos, subcarpetas o reglas)
+const TYPE_ALIASES = new Map([
+    ['square tube', 'SQ Tube'], ['squaretube', 'SQ Tube'], ['sq tube', 'SQ Tube'], ['square', 'SQ Tube'],
+    ['flat', 'Flat Bar'], ['flatbar', 'Flat Bar'], ['hr sheet', 'HR Sheet'], ['hrsheet', 'HR Sheet'], ['11ga', 'HR Sheet'],
+    ['floor plate', 'Floor Plate'], ['ss pipe', 'Pipe'], ['beams', 'Beam'], ['channels', 'Channel'], ['angles', 'Angle'],
+    ['plates', 'Plate'], ['pipes', 'Pipe'],
+]);
+// Premier: los PO tienen 6 cifras y empiezan con 2 (211708, 216342…). Sin sello, un PO que no se parezca a esto es
+// el de Steel & Pipe (o del distribuidor) con el molino, y no se usa.
+const PREMIER_PO_RE = /^2\d{5}$/;
+const MIN_NATIVE_CHARS = 40;
+
+// Reglas de tipo, en orden. Se prueban primero sobre la línea del producto (SECTION:, Description, SHAPE / SIZE,
+// Material:, Size:…) y si ahí no hay nada, sobre todo el documento.
+const TYPE_RULES = [
+    { tipo: 'Rebar',       re: /\b(?:REBARS?|REINFORC(?:ING|EMENT)(?: BARS?)?|DEFORMED BARS?)\b|\bA ?615\b/ },
+    { tipo: 'Floor Plate', re: /\b(?:FLOOR|TREAD|CHECKER(?:ED)?|DIAMOND) ?PLATES?\b|\bA ?786\b/ },
+    { tipo: 'HR Sheet',    re: /\b\d{1,2} ?GA\b(?=.{0,80}\b(?:SHEETS?|A ?1011|COILS?)\b)|\b(?:SHEETS?|A ?1011)\b.{0,80}\b\d{1,2} ?GA\b|\bHR ?SHEETS?\b|\bA ?1011\b/ },
+    { tipo: 'Beam',        re: /\b(?:WIDE ?F[LI1]ANGES?|F[LI1]ANGE ?B\w{2,4}|[WH][- ]?BEAMS?|BEAMS?|STRUCTURAL SECTIONS?)\b|\b(?:W|HP) ?\d{1,2} ?X ?\d{1,3}(?:\.\d+)?\b/ },
+    { tipo: 'Channel',     re: /\b(?:CHAN+E[LI1]S?|C[- ]SHAPES?)\b|\bM?C ?\d{1,2} ?X ?\d{1,2}(?:\.\d+)?\b/ },
+    { tipo: 'Angle',       re: /\b(?:(?:UN)?EQUAL ANG[LI1]ES?|ANG[LI1]ES?|ANG|L[- ]SHAPES?)\b|\bL ?\d{1,2}(?:-\d\/\d)? ?X ?\d/ },
+    { tipo: 'Flat Bar',    re: /\bF[LI1]AT ?BA[RT]S?\b|\bF[LI1]ATS?\b|\bFB\b/ },
+    { tipo: 'Pipe',        re: /\bPIPES?\b|\bSCH(?:EDULE)?\.? ?(?:\d{2,3}|XX?S|STD)\b|\bNPS\b|\bA ?(?:53|106) ?-?(?:GR\.? ?)?B\b|\bASTM ?A ?(?:53|106)\b|\bROUND\b/ },
+    { tipo: 'SQ Tube',     re: /\bSQ(?:UARE)?\.? ?TUB(?:E|ES|ING)\b|\bHSS\b|\bTUBING\b|\bRECT(?:ANGULAR)?\b|\bSQUARES?\b/ },
+];
+const PLATE_RE = /\b(?:PLATES?|PLT|SHEETS?|COILS?|ROLLS?|HOT BAND|BLACK-PRIME|HOT ROLL(?:ED)?)\b/;
+// Frases que contienen palabras de producto pero NO describen el producto: "Steel & Pipe Supply", "beam blanks",
+// "bend angle", "Steel Tube Institute"…
+const TYPE_NOISE_RE = /\b(?:(?:BEND(?:ING)?|BEVEL) (?:TEST )?ANGLES?|ANGLES? OF BEND|HS ?CODE|OUT OF SQUARE|SQ(?:UARE)?\.? ?(?:FT|FEET|IN|INCH(?:ES)?|MM|CM|M|METERS?)|(?:STEE[LI!] ?(?:AND|&) ?)?(?:AND ?)?PIPE ?(?:AND|&)? ?SUPP\w*|BEAM BLANKS?|FLAT (?:ROLL\w*,? ?)?(?:GRO\w*|DIVISION)|FLAT ROLL(?:ED)?|STEEL TUBE (?:&|AND )?(?:METALS )?(?:SERVICE CENTER )?INSTITUTE|TUBE INSTITUTE|ATLAS TUBE|NOVA TUBE)\b/g;
+// Etiquetas que van justo antes de la descripción del producto en los MTR de tus proveedores
+const PRODUCT_LABEL_RE = /\b(?:SECTION|DESCRIPTION|SHAPE ?\/ ?SIZE|PRODUCT(?: (?:DESCRIPTION|INFORMATION|INI\w*|GROUP))?|MATERIAL|SIZE|PART NUMBER)\b ?:?/g;
+
+function productText(norm) {
+    const out = [];
+    for (const m of norm.matchAll(PRODUCT_LABEL_RE)) out.push(norm.slice(m.index + m[0].length, m.index + m[0].length + 160));
+    return out.join(' | ');
+}
+const HEAT_SKIP_NEXT = /^(?:TREAT|INPUT|RESIST|AFFECTED|SINK|TINT)/;
+const FIELD_LABELS = new Set(['HEAT', 'PO', 'CUSTOMER', 'ORDERREF']);
+
+// Palabras típicas de un MTR: sirven para saber si un texto es legible o son "jeroglíficos"
+const MTR_WORDS = new Set(['HEAT', 'GRADE', 'CHEMICAL', 'CHEMISTRY', 'TENSILE', 'YIELD', 'ELONGATION', 'CERTIFIED', 'CERTIFICATE',
+    'CERTIFICATION', 'TEST', 'TESTS', 'REPORT', 'SIZE', 'WEIGHT', 'CUSTOMER', 'ORDER', 'STEEL', 'MILL', 'ASTM', 'ASME',
+    'SPECIFICATION', 'CARBON', 'MANGANESE', 'SULFUR', 'PHOSPHORUS', 'SILICON', 'COPPER', 'NICKEL', 'CHROMIUM', 'MOLYBDENUM',
+    'VANADIUM', 'PSI', 'KSI', 'MPA', 'LBS', 'LENGTH', 'QUANTITY', 'QTY', 'MATERIAL', 'PRODUCT', 'DESCRIPTION', 'SHIPPED',
+    'SHIP', 'DATE', 'HARDNESS', 'IMPACT', 'MELTED', 'MANUFACTURED', 'STRENGTH', 'PIECES', 'PCS', 'WALL', 'THICKNESS',
+    'WIDTH', 'COLADA', 'ACERO', 'CERTIFICADO', 'CALIDAD', 'QUIMICA', 'CLIENTE', 'PEDIDO']);
+
+// Aprendizaje de tipo
+const ML = { ALPHA: 0.25, MIN_DIFF: 0.4, STRONG: 6, WEAK: 2.5, TEMP: 3, MAX_TOKENS: 1000 };
+const FEATURE_STOP = new Set(['THE', 'AND', 'OF', 'TO', 'IN', 'FOR', 'WITH', 'IS', 'ARE', 'BE', 'BY', 'ON', 'AT', 'AS', 'THIS',
+    'THAT', 'WE', 'OUR', 'ALL', 'OR', 'AN', 'NO', 'HEAT', 'PO', 'CUSTOMER', 'ORDERREF', 'POBOX']);
+const LABEL_FILLER = new Set(['NO', 'NUMBER', 'NUM', 'NBR', 'NR', 'ID', 'CODE']);
+const LABEL_STOP = new Set(['THE', 'OF', 'AND', 'TO', 'FOR', 'DATE', 'QTY', 'QUANTITY', 'WEIGHT', 'SIZE', 'GRADE', 'SPEC',
+    'ITEM', 'LINE', 'PAGE', 'TOTAL', 'LBS', 'KG', 'FT', 'IN', 'X', 'CERT', 'CERTIFICATE', 'PCS', 'PIECES', 'LENGTH']);
+
+function normalizeText(raw) {
+    let t = String(raw || '').toUpperCase()
+        .replace(/[‐-―−]/g, '-')
+        .replace(/¥/g, 'Y')                    // el OCR lee la Y como ¥ ("¥27473G26")
+        .replace(/\s+/g, ' ');
+
+    // Etiquetas que el OCR separa letra por letra ("H E A T")
+    t = t.replace(/\bH ?E ?A ?T\b/g, 'HEAT');
+    t = t.replace(/\bC ?U ?S ?T ?O ?M ?E ?R(?:['’]?S)?\b/g, 'CUSTOMER');
+    // Español (molinos de México): "No. de Colada", "Orden de compra"
+    t = t.replace(/\b(?:NO\.? ?(?:DE )?)?COLADAS?\b/g, 'HEAT');
+    t = t.replace(/\bORDEN (?:DE )?COMPRA\b/g, 'CUSTOMER PO');
+
+    // Variantes de PO: P.O. / P/O / PO# / P.0. (OCR). Solo como palabra suelta.
+    t = t.replace(/\bP\. ?0\./g, 'PO ');
+    t = t.replace(/\bP ?[.\/]? ?O\b\.?/g, 'PO');
+    t = t.replace(/\bPO ?BOX\b/g, 'POBOX');                       // dirección, no es un PO
+    t = t.replace(/\bCUST\.? ?PO\b/g, 'CUSTOMER PO');
+    t = t.replace(/\b(?:CUSTOMER|CUST\.?|PURCHASE|YOUR) ?ORDER\b(?: ?(?:NUMBERS?\b|NUM\b|NO\b\.?|#))?/g, 'CUSTOMER PO ');
+    t = t.replace(/\b(CUSTOMER PO|PO) ?(?:NUMBERS?\b|NUM\b|NO\b\.?)/g, '$1 ');
+    t = t.replace(/ {2,}/g, ' ');
+    // "ORDER NO" genérico = PO de baja prioridad, salvo que sea orden de venta / molino / interna
+    t = t.replace(/(?<!\b(?:SALES|MILL|SHOP|WORK|JOB|PRODUCTION|MFG|MANUFACTURING|INTERNAL|MASTER|SHIPPING|SHIP) )\bORDER ?(?:NUMBERS?\b|NUM\b|NO\b\.?|#)/g, 'ORDERREF ');
+
+    // Variantes de HEAT
+    t = t.replace(/\bCHEMISTRY ?HEAT\b/g, 'HEAT');
+    t = t.replace(/\bHEAT ?\/ ?(?:SLAB|LOT)\b/g, 'HEAT');
+    t = t.replace(/\bHEAT ?(?:NUMBERS?\b|NUM\b|NO\b\.?|CODE\b|ID\b)/g, 'HEAT ');
+    t = t.replace(/\bHT ?(?:NO\b\.?|#|:)/g, 'HEAT ');
+
+    return t.replace(/ {2,}/g, ' ').trim();
+}
+
+function cleanToken(tok) {
+    return String(tok || '').replace(/^[^A-Z0-9]+|[^A-Z0-9]+$/g, '');
+}
+
+function tokenize(text) {
+    return normalizeText(text).split(' ').map(cleanToken).filter(Boolean);
+}
+
+// Un código válido: letras/números con guiones internos, AL MENOS un dígito y que no sea una fecha.
+function isValidCode(v, min, max) {
+    return typeof v === 'string'
+        && v.length >= min && v.length <= max
+        && /^[A-Z0-9]+(?:-[A-Z0-9]+)*$/.test(v)
+        && /\d/.test(v)
+        && !/^\d{1,4}-\d{1,2}-\d{1,4}$/.test(v);
+}
+const isHeat = v => isValidCode(v, 5, 20);
+const isPO = v => isValidCode(v, 4, 20);
+
+// Valor escrito justo después de la etiqueta ("HEAT: A12345"). Revisa TODAS las apariciones.
+function findByLabel(text, label, validate) {
+    const re = new RegExp('\\b' + label + '(?![A-Z0-9])[\\s:#=.\\-]*([A-Z0-9][A-Z0-9-]{2,24})(?![A-Z0-9-])', 'g');
+    for (const m of text.matchAll(re)) {
+        const v = cleanToken(m[1]);
+        if (validate(v)) return v;
+    }
+    return null;
+}
+
+// Tablas con encabezados juntos: "CUSTOMER PO | HEAT NO" y luego los valores en el mismo orden.
+function findHeaderPair(tokens) {
+    for (let i = 0; i < tokens.length - 1; i++) {
+        let order = null;
+        let start = 0;
+        if (tokens[i] === 'PO' && tokens[i + 1] === 'HEAT') { order = ['po', 'heat']; start = i + 2; }
+        else if (tokens[i] === 'HEAT' && tokens[i + 1] === 'PO') { order = ['heat', 'po']; start = i + 2; }
+        else if (tokens[i] === 'HEAT' && tokens[i + 1] === 'CUSTOMER' && tokens[i + 2] === 'PO') { order = ['heat', 'po']; start = i + 3; }
+        if (!order) continue;
+        const vals = [];
+        for (let j = start; j < tokens.length && j < start + 12 && vals.length < 2; j++) {
+            if (FIELD_LABELS.has(tokens[j])) break;
+            if (isPO(tokens[j])) vals.push(tokens[j]);
+        }
+        if (vals.length === 2) {
+            const r = { [order[0]]: vals[0], [order[1]]: vals[1] };
+            if (!isHeat(r.heat)) r.heat = null;
+            return r;
+        }
+    }
+    return null;
+}
+
+// Primer valor válido en las palabras siguientes a la etiqueta, sin cruzar hacia otra etiqueta.
+function findNear(tokens, label, validate, skipIf, reach = 5) {
+    for (let i = 0; i < tokens.length; i++) {
+        if (tokens[i] !== label) continue;
+        if (skipIf && skipIf(tokens[i + 1] || '')) continue;
+        for (let j = i + 1; j < tokens.length && j <= i + reach; j++) {
+            if (FIELD_LABELS.has(tokens[j])) break;
+            if (validate(tokens[j])) return tokens[j];
+        }
+    }
+    return null;
+}
+
+// Heat y PO. "kb" (lo aprendido) aporta etiquetas propias de cada molino, ej. "CAST NO" o "MELT".
+function extractFields(rawText, kb) {
+    const text = normalizeText(rawText);
+    const tokens = text.split(' ').map(cleanToken).filter(Boolean);
+
+    let heat = findByLabel(text, 'HEAT', isHeat) || findByLabel(text, 'COLLECT ?NO\\.?', isHeat);
+    let po = findByLabel(text, 'CUSTOMER PO', isPO) || findByLabel(text, 'PO', isPO) || findByLabel(text, 'ORDERREF', isPO);
+
+    if (kb && kb.labels) {
+        if (!heat) for (const { label } of kb.labels.heat) { heat = findNear(tokens, label, isHeat, null, 3); if (heat) break; }
+        if (!po) for (const { label } of kb.labels.po) { po = findNear(tokens, label, isPO, null, 3); if (po) break; }
+    }
+    if (!heat || !po) {
+        const pair = findHeaderPair(tokens);
+        if (pair) {
+            if (!heat && pair.heat) heat = pair.heat;
+            if (!po && pair.po) po = pair.po;
+        }
+    }
+    if (!heat) heat = findNear(tokens, 'HEAT', isHeat, next => HEAT_SKIP_NEXT.test(next));
+    if (!po) po = findNear(tokens, 'PO', isPO) || findNear(tokens, 'ORDERREF', isPO);
+
+    heat = heat || UNKNOWN;
+    po = po || UNKNOWN;
+    if (po !== UNKNOWN) po = po.replace(/^\d{4}-/, '') || po;   // regla original: quita prefijo "1234-"
+    return { heat, po };
+}
+
+// ---------- Sello de Steel & Pipe Supply ----------
+// Los MTR que manda Steel & Pipe Supply traen este sello:
+//     Steel & Pipe Supply Co. / Premier Plant Services / Customer PO: 9100-216342 / Heat: 1614329 / Shipment: 0026051438
+// Si aparece, su PO y su Heat MANDAN sobre todo lo demás: el PO que trae el cuerpo del MTR es el de
+// Steel & Pipe con el molino, no el de Premier. No todos los MTR lo traen; sin sello se lee el MTR como siempre.
+const STAMP_PO_RE = /\bCUST[A-Z]{2,6} ?P[O0]\b[^A-Z0-9]{0,6}((?:[0-9OIL]{4} ?- ?)?[A-Z0-9][A-Z0-9-]{2,24})/g;
+const STAMP_HEAT_RE = /\bH[E3][A4]T\b[^A-Z0-9]{0,6}([A-Z0-9][A-Z0-9-]{2,24})/g;
+const STAMP_SHIP_RE = /\bSH[I1L]?P ?M[A-Z]{0,4}\b[^A-Z0-9]{0,6}([0-9OIL]{6,16})/g;
+const STAMP_ANCHOR_RE = /PIPE ?SUPPL|PREMIER|PLANT SERVICES/;
+
+// En el sello el PO y el Shipment son solo números: corrige las letras que el OCR confunde con números
+function stampDigits(v) {
+    const s = String(v || '').replace(/\s+/g, '');
+    return /^[0-9OIL-]+$/.test(s) && (s.match(/\d/g) || []).length >= 3 ? s.replace(/O/g, '0').replace(/[IL]/g, '1') : s;
+}
+
+function stampPo(v) {
+    const s = String(v || '');
+    const m = s.match(/(?:^|-)(2\d{5})(?=-|$)/);
+    if (m) return m[1];
+    return isPO(s) && !/^\d{7,}$/.test(s) ? (s.replace(/^\d{4}-/, '') || s) : null;
+}
+
+// Si el OCR leyó el sello desordenado ("Customer PO | 1611214 | Heat: | … 9100-216324"), se lee por zona:
+// entre "Premier"/"Steel & Pipe" y el número de Shipment están el PO (9100-2xxxxx), el Heat y el Shipment.
+function stampByZone(text) {
+    const ship = [...text.matchAll(/\bSH[I1L]?P ?M[A-Z]{0,4}\b[^A-Z0-9]{0,30}?(00\d{8})\b/g)][0]
+        || [...text.matchAll(/\b(00\d{8})\b/g)].find(m => /SH[I1L]?P ?M/.test(text.slice(Math.max(0, m.index - 60), m.index)));
+    if (!ship) return null;
+    const startA = text.lastIndexOf('PREMIER', ship.index);
+    const startB = text.lastIndexOf('PIPE SUPP', ship.index);
+    const start = Math.max(startA, startB);
+    if (start < 0 || ship.index - start > 260) return null;
+    const zone = text.slice(start, ship.index);
+    const poM = zone.match(/(?<![\d-])(?:\d{4} ?- ?)(2\d{5})(?![\d])/) || zone.match(/\bCUST[A-Z]{2,6} ?P[O0]\b[^A-Z0-9]{0,6}(2\d{5})(?!\d)/);
+    const po = poM ? poM[1] : null;
+    let heat = null;
+    const hl = zone.match(/\bH[E3][A4]T\b[^A-Z0-9]{0,6}([A-Z0-9][A-Z0-9-]{2,24})/);
+    if (hl && isHeat(cleanToken(hl[1])) && !/^(?:SHIP|CUST)/.test(hl[1])) heat = cleanToken(hl[1]);
+    if (!heat) {
+        const skip = new Set(['PREMIER', 'PLANT', 'SERVICES', 'SERVICE', 'LLC', 'CUSTOMER', 'PO', 'HEAT', 'SHIPMENT', 'STEEL', 'PIPE', 'SUPPLY', 'CO']);
+        for (const tok of zone.split(/\s+/).map(cleanToken)) {
+            if (!tok || skip.has(tok) || tok.includes(po || '#') || /^\d{4}-/.test(tok)) continue;
+            if (isHeat(tok) && /\d{3}/.test(tok)) { heat = tok; break; }
+        }
+    }
+    if (!po && !heat) return null;
+    return { po, heat, shipment: ship[1], poRaw: poM ? poM[0].trim() : null, score: 1 };
+}
+
+function findStamp(rawText) {
+    if (!rawText) return null;
+    const text = normalizeText(rawText);
+    if (!/\bCUST[A-Z]{2,6} ?P[O0]\b/.test(text)) return null;
+    const zone = stampByZone(text);
+    const all = (re, fix) => [...text.matchAll(re)].map(m => ({ i: m.index, end: m.index + m[0].length, v: fix(cleanToken(m[1])) }));
+    const pos = all(STAMP_PO_RE, stampDigits);
+    const heats = all(STAMP_HEAT_RE, v => v);
+    const ships = all(STAMP_SHIP_RE, stampDigits);
+    let best = null;
+    for (const p of pos) {
+        // El Heat va justo debajo del PO; se permite algo de basura del OCR en medio
+        const h = heats.find(x => x.i >= p.end && x.i - p.end <= 40);
+        if (!h) continue;
+        const s = ships.find(x => x.i >= h.end && x.i - h.end <= 40);
+        const anchor = STAMP_ANCHOR_RE.test(text.slice(Math.max(0, p.i - 90), p.i));
+        if (!s && !anchor) continue;   // un "Customer PO … Heat …" del cuerpo del MTR, no el sello
+        const po = stampPo(p.v);   // "9100-216342" → 216342 · "8780-215444-21" → 215444
+        const heat = isHeat(h.v) ? h.v : null;
+        if (!po && !heat) continue;
+        const score = (s ? 2 : 0) + (anchor ? 2 : 0) + (po ? 1 : 0) + (heat ? 1 : 0);
+        if (!best || score > best.score) best = { po, heat, shipment: s ? s.v : null, poRaw: p.v, score };
+    }
+    // Completa con lo leído por zona lo que la lectura ordenada no pudo sacar
+    if (zone && (!best || !best.po || !best.heat)) {
+        if (!best) return zone;
+        return { ...best, po: best.po || zone.po, heat: best.heat || zone.heat, shipment: best.shipment || zone.shipment };
+    }
+    return best;
+}
+
+const TABLE_HEADER_WORDS = new Set(['TAG', 'TAGS', 'AG', 'PCS', 'PES', 'PCE', 'PC', 'PIECES', 'LBS', 'LB', 'WEIGHT', 'WT', 'NO', 'NUMBER', 'QTY', 'QUANTITY', 'ID',
+    'LOT', 'COIL', 'SIZE', 'GRADE', 'BUNDLE', 'BUNDLES', 'ITEM', 'LENGTH', 'KG', 'KGS', 'VEN', 'COUNT', 'SLAB', 'BATCH']);
+// Heat en una tabla: encabezado "Heat Tag Pcs LBS" y en la fila de abajo, entre medidas y cantidades, el valor
+function tableHeat(texts) {
+    for (const s of texts) {
+        if (!s) continue;
+        const toks = normalizeText(s).split(' ');
+        for (let i = 0; i < toks.length; i++) {
+            if (cleanToken(toks[i]) !== 'HEAT') continue;
+            let j = i + 1;
+            let hits = 0;
+            while (j < toks.length && j <= i + 6 && /^[A-Z]{2,7}$/.test(cleanToken(toks[j]))) {   // resto del encabezado
+                if (TABLE_HEADER_WORDS.has(cleanToken(toks[j]))) hits++;
+                j++;
+            }
+            if (hits < 2) continue;                      // tiene que verse como encabezado de tabla: "Heat Tag Pcs LBS"
+            for (let k = j; k < toks.length && k < j + 14; k++) {
+                const raw = toks[k];
+                const v = cleanToken(raw);
+                if (/["'°,]|\d\.\d|X\d|\dX/.test(raw) || /^\d{1,2}\/\d/.test(v)) continue;     // medidas, pesos, fechas
+                if (v.length >= 6 && v.length <= 14 && isHeat(v) && /^[A-Z]{0,3}\d/.test(v)) return v;
+            }
+        }
+    }
+    return null;
+}
+
+// En un Heat la letra O pegada a números casi siempre es un cero mal leído (FO5955C25 → F05955C25)
+function fixHeat(h) {
+    if (!h || h === UNKNOWN) return h;
+    return h.replace(/O(?=\d)|(?<=\d)O/g, '0');
+}
+
+// Un PO de Premier escrito en el cuerpo: "PO No#: 216212", o en la tabla de Steel & Pipe "… 215912 09/29/2026"
+function premierPo(texts) {
+    for (const s of texts) {
+        if (!s) continue;
+        const norm = normalizeText(s);
+        for (const m of norm.matchAll(/\b(?:CUSTOMER PO|PO|ORDERREF)\b[^A-Z0-9]{0,4}(?:\d{4}-)?(2\d{5})(?![\d-])/g)) return m[1];
+        const row = norm.match(/(?<![\d.,-])(2\d{5}) \d{1,2}\/\d{1,2}\/\d{2,4}\b/);
+        if (row) return row[1];
+    }
+    return null;
+}
+
+function findStampInTexts(t) {
+    if (!t) return null;
+    let partial = null;
+    for (const s of [t.stampText, t.native, t.ocr]) {
+        const r = findStamp(s);
+        if (r && r.po && r.heat) return r;
+        if (r && !partial) partial = r;
+    }
+    return partial;
+}
+
+function ruleType(typeText) {
+    // 1) la línea del producto (SECTION:, Description, SHAPE / SIZE, Material:…); 2) todo el documento
+    for (const src of [productText(typeText), typeText]) {
+        if (!src) continue;
+        for (const r of TYPE_RULES) if (r.re.test(src)) return { tipo: r.tipo, detected: true };
+        const shape = shapeFromSize(src);
+        if (shape) return { tipo: shape, detected: true };
+    }
+    return { tipo: 'Plate', detected: PLATE_RE.test(typeText) };
+}
+
+// Decide el tipo: 1) tus reglas, 2) lo aprendido si está seguro, 3) reglas automáticas, 4) lo aprendido si duda, 5) Plate asumido.
+function decideType(rawText, kb) {
+    const norm = normalizeText(rawText);
+    const typeText = norm.replace(TYPE_NOISE_RE, ' ');
+    const rule = ruleType(typeText);
+    const out = {
+        tipo: rule.tipo, tipoDetected: rule.detected, tipoSource: rule.detected ? 'reglas' : 'asumido',
+        ruleTipo: rule.detected ? rule.tipo : null, ml: null, conflict: false, ruleMatched: null,
+    };
+    if (!kb) return out;
+    for (const r of kb.rules || []) {
+        if (r.re.test(typeText)) return { ...out, tipo: r.tipo, tipoDetected: true, tipoSource: 'regla tuya', ruleMatched: r.raw };
+    }
+    if (kb.model) {
+        const ml = predictType(kb.model, featureTokens(norm.split(' ').map(cleanToken).filter(Boolean), new Set()));
+        out.ml = ml;
+        if (ml) {
+            const disagree = rule.detected && ml.tipo !== rule.tipo;
+            // Si las reglas encontraron un tipo que el modelo nunca vio, el modelo no puede opinar sobre él
+            const modelKnowsRule = !rule.detected || kb.model.classes.includes(rule.tipo);
+            if (ml.margin >= ML.STRONG && modelKnowsRule) {
+                return { ...out, tipo: ml.tipo, tipoDetected: true, tipoSource: 'aprendido', conflict: disagree };
+            }
+            if (!rule.detected && ml.margin >= ML.WEAK) {
+                return { ...out, tipo: ml.tipo, tipoDetected: true, tipoSource: 'aprendido' };
+            }
+            if (disagree && ml.margin >= ML.WEAK) out.conflict = true;
+        }
+    }
+    return out;
+}
+
+// ---------- Medidas ----------
+// Como van en tus nombres ("Tipo medidas Heat X PO Y"), aprendido de tus ejemplos:
+//   Beam 10x22 (W10X22) · Channel 10x15.3 (C10X15.3) · Plate .75xA36 (grosor x grado) · Floor Plate .25xA786
+//   Angle 3x3x.375 (dos caras x grosor) · SQ Tube 3x3x.375 (lados x pared) · Flat Bar .25x4 (grosor x ancho)
+//   Pipe 1.25xSCH 40 (tamaño nominal x cédula) · Rebar #6 · HR Sheet 11GA
+// Un nombre de archivo no puede llevar "/", así que las fracciones pasan a decimales (1/4 → .25), sin cero adelante.
+const DIM_LEADING_ZERO = false;   // false: .25 (como en tus nombres) · true: 0.25
+const DIM_TYPES = new Set(['Beam', 'Channel', 'Plate', 'Floor Plate', 'Angle', 'SQ Tube', 'Flat Bar', 'Pipe', 'Rebar', 'HR Sheet']);
+const DIM_EXAMPLE = { Beam: '10x22', Channel: '10x15.3', Plate: '.75xA36', 'Floor Plate': '.25xA786', Angle: '3x3x.375',
+    'SQ Tube': '3x3x.375', 'Flat Bar': '.25x4', Pipe: '1.25xSCH 40', Rebar: '#6', 'HR Sheet': '11GA' };
+const DN = String.raw`(\d+-\d+/\d+|\d+/\d+|\d*\.\d+|\d+)`;          // 2-1/2 · 1/4 · .375 · 0.750 · 4
+const DNEND = String.raw`(?![\d/]|\.\d)`;
+const DSTART = String.raw`(?<![\d./-])`;
+
+// Pesos nominales AISC por peralte: sirven para confirmar una viga/canal y corregir el "#" que el OCR lee como "4"
+const W_SHAPES = { 3: [5.7, 7.5], 4: [7.7, 9.5, 13], 5: [10, 16, 19], 6: [8.5, 9, 12, 12.5, 15, 16, 17.25, 20, 25], 8: [10, 13, 15, 18, 18.4, 21, 23, 24, 28, 31, 35, 36, 40, 48, 58, 67],
+    10: [12, 15, 17, 19, 22, 25.4, 26, 30, 33, 35, 39, 42, 45, 49, 54, 57, 60, 68, 77, 88, 100, 112],
+    12: [14, 16, 19, 22, 26, 30, 31.8, 35, 40, 40.8, 45, 50, 53, 58, 63, 65, 72, 74, 79, 84, 87, 89, 96, 102, 106, 117, 120, 136, 152, 170, 190, 210, 230, 252, 279, 305, 336],
+    14: [22, 26, 30, 34, 38, 43, 48, 53, 61, 68, 73, 74, 82, 89, 90, 99, 102, 109, 117, 120, 132, 145, 159, 176, 193, 211, 233, 257, 283, 311, 342, 370, 398, 426, 455, 500, 550, 605, 665, 730],
+    15: [42.9, 50], 16: [26, 31, 36, 40, 45, 50, 57, 67, 77, 89, 100], 18: [35, 40, 46, 50, 54.7, 55, 60, 65, 70, 71, 76, 86, 97, 106, 119, 130, 143, 158, 175],
+    20: [66, 75, 86, 96], 21: [44, 48, 50, 55, 57, 62, 68, 73, 83, 93, 101, 111, 122, 132, 147, 166, 182, 201],
+    24: [55, 62, 68, 76, 80, 84, 90, 94, 100, 103, 104, 106, 117, 121, 131, 146, 162, 176, 192, 207, 229, 250],
+    27: [84, 94, 102, 114, 129, 146, 161, 178, 194, 217, 235, 258, 281, 307, 336, 368], 30: [90, 99, 108, 116, 124, 132, 148, 173, 191, 211, 235, 261, 292, 326, 357, 391],
+    33: [118, 130, 141, 152, 169, 201, 221, 241, 263, 291, 318, 354, 387], 36: [135, 150, 160, 170, 182, 194, 210, 231, 232, 247, 256, 262, 282, 302, 330, 361, 395] };
+const C_SHAPES = { 3: [3.5, 4.1, 5, 6, 7.1], 4: [4.5, 5.4, 6.25, 7.25, 13.8], 5: [6.7, 9], 6: [8.2, 10.5, 12, 13, 15.1, 15.3, 16.3, 18], 7: [9.8, 12.25, 14.75, 19.1, 22.7],
+    8: [8.5, 11.5, 13.75, 18.7, 18.75, 20, 21.4, 22.8], 9: [13.4, 15, 20, 23.9, 25.4], 10: [6.5, 8.4, 15.3, 20, 22, 25, 28.5, 30, 33.6, 41.1],
+    12: [10.6, 14.3, 20.7, 25, 30, 31, 35, 40, 45, 50], 13: [31.8, 35, 40, 50], 15: [33.9, 40, 50], 18: [42.7, 45.8, 51.9, 58] };
+
+function snapWeight(table, depth, wStr) {
+    const list = table[depth];
+    if (!list) return null;
+    const w = Number(wStr);
+    if (list.includes(w)) return w;
+    if (/4$/.test(wStr) && list.includes(Number(wStr.slice(0, -1)))) return Number(wStr.slice(0, -1));   // "15.34" = 15.3#
+    return null;
+}
+
+// Tubo nominal (NPS): diámetro exterior y pared por cédula, para pasar "1.660 x .140" a "1.25xSCH 40"
+const NPS_TABLE = [
+    [0.125, 0.405, { 40: 0.068, 80: 0.095 }], [0.25, 0.54, { 40: 0.088, 80: 0.119 }], [0.375, 0.675, { 40: 0.091, 80: 0.126 }],
+    [0.5, 0.84, { 40: 0.109, 80: 0.147, 160: 0.188, XXS: 0.294 }], [0.75, 1.05, { 40: 0.113, 80: 0.154, 160: 0.219, XXS: 0.308 }],
+    [1, 1.315, { 40: 0.133, 80: 0.179, 160: 0.25, XXS: 0.358 }], [1.25, 1.66, { 40: 0.14, 80: 0.191, 160: 0.25, XXS: 0.382 }],
+    [1.5, 1.9, { 40: 0.145, 80: 0.2, 160: 0.281, XXS: 0.4 }], [2, 2.375, { 40: 0.154, 80: 0.218, 160: 0.344, XXS: 0.436 }],
+    [2.5, 2.875, { 40: 0.203, 80: 0.276, 160: 0.375, XXS: 0.552 }], [3, 3.5, { 40: 0.216, 80: 0.3, 160: 0.438, XXS: 0.6 }],
+    [3.5, 4, { 40: 0.226, 80: 0.318 }], [4, 4.5, { 40: 0.237, 80: 0.337, 120: 0.438, 160: 0.531, XXS: 0.674 }],
+    [5, 5.563, { 40: 0.258, 80: 0.375, 120: 0.5, 160: 0.625, XXS: 0.75 }], [6, 6.625, { 40: 0.28, 80: 0.432, 120: 0.562, 160: 0.719, XXS: 0.864 }],
+    [8, 8.625, { 20: 0.25, 30: 0.277, 40: 0.322, 60: 0.406, 80: 0.5, 100: 0.594, 120: 0.719, 140: 0.812, 160: 0.906 }],
+    [10, 10.75, { 20: 0.25, 30: 0.307, 40: 0.365, 60: 0.5, 80: 0.594, 100: 0.719, 120: 0.844, 140: 1, 160: 1.125 }],
+    [12, 12.75, { 20: 0.25, 30: 0.33, 40: 0.406, 60: 0.562, 80: 0.688, 100: 0.844, 120: 1, 140: 1.125, 160: 1.312 }],
+];
+const REBAR_MM = { 10: 3, 13: 4, 16: 5, 19: 6, 22: 7, 25: 8, 29: 9, 32: 10, 36: 11, 43: 14, 57: 18 };
+
+function dimNum(s) {
+    const t = String(s);
+    const frac = (n, d) => (n >= d && [2, 4, 8, 16, 32, 64].includes(d) ? 1 : n) / d;   // "4/2" es un "1/2" mal leído
+    let m = t.match(/^(\d+)-(\d+)\/(\d+)$/);
+    if (m) return +m[3] ? +m[1] + frac(+m[2], +m[3]) : NaN;
+    m = t.match(/^(\d+)\/(\d+)$/);
+    if (m) return +m[2] ? frac(+m[1], +m[2]) : NaN;
+    return Number(t);
+}
+
+function fmtDim(n) {
+    if (!Number.isFinite(n) || n <= 0) return '';
+    const s = String(Math.round(n * 10000) / 10000);
+    return DIM_LEADING_ZERO ? s : s.replace(/^0\./, '.');
+}
+
+// Un grosor de plancha real está cerca de un dieciseisavo (o es lámina fina). "4.594" junto a "x 60 x 120" es un peso.
+function plausiblePlate(a) {
+    if (!(a > 0 && a <= 8)) return false;
+    if (a < 0.3) return true;
+    const nom = Math.round(a * 16) / 16;
+    return Math.abs(a - nom) <= (a >= 1.5 ? 0.004 : 0.012);
+}
+
+// Grosor de plancha: lo medido (0.4952, 0.4900) se lleva al nominal más cercano en dieciseisavos; lo fino se deja igual
+function fmtPlate(n) {
+    if (n >= 0.3) {
+        const nom = Math.round(n * 16) / 16;
+        if (Math.abs(nom - n) <= 0.012) return fmtDim(nom);
+    }
+    return fmtDim(n);
+}
+
+// Texto listo para buscar medidas: sin pulgadas, "4 X 4" → "4X4", "1 / 4" → "1/4", "2 1/2" → "2-1/2", "0,750" → "0.750"
+function dimsText(raw) {
+    return normalizeText(raw)
+        .replace(/[×✕✖]/g, 'X')
+        .replace(/\b0,(\d)/g, '0.$1')
+        .replace(/(\d) ?\/ ?(\d)/g, '$1/$2')
+        .replace(/(\d)°(?= ?X)/g, '$1')
+        .replace(/(\d) ?(?:IN(?:CH(?:ES)?)?\b\.?|"|''|”|″|“)/g, '$1')
+        .replace(/\b(\d{1,2})[ -](\d{1,2}\/\d{1,2})\b/g, '$1-$2')
+        .replace(/(\d)N(\d{1,3}(?:\.\d)?#)/g, '$1X$2')                         // Gerdau: "12N40#"
+        .replace(/(^|[\s\/])& ?X ?(?=\d)/g, '$18X')                            // "& X 11.5" = 8 X 11.5
+        .replace(/\$(?=\.\d)/g, '1')                                            // "$.660" = 1.660
+        .replace(/X ?(?:DESCRIPTION|SIZE|PRODUCT) ?(?=\.?\d)/g, 'X')            // renglón partido: "3 1/2 X 3 1/2 X | Description 3/8"
+        .replace(/(\d) ?(?:X ?X?|\*) ?(?=\.?\d)/g, '$1X');                     // el OCR a veces lee "8xX11.5" o "4*4"
+}
+
+function* dimMatches(t, re) { for (const m of t.matchAll(re)) yield m; }
+
+const DIM_RE = {
+    beamPre: /\b(?:W|HP|S|M|WF) ?(\d{1,2})X(\d{1,3}(?:\.\d{1,2})?)(?![\d/]|\.\d)/g,
+    beamWord: /\b(?:BEAMS?|FLANGES?|B\w{2,4}) ?\/? ?(\d{1,2})X ?(\d{1,3}(?:\.\d{1,2})?)(?![\d/]|\.\d)/g,
+    weight: /(?<![\d.])(\d{1,2})X ?(\d{1,3}(?:\.\d{1,2})?)(#|(?![\d/]|\.\d))/g,
+    gerdau: /(?<![\d.])(\d{1,2})X ?(\d{1,3}(?:\.\d{1,2})?)[#4] ?\/ ?\d{2,3}/g,                  // "6 X 15#/150" (Gerdau)
+    channelPre: /\b(?:M?C ?(?=\d)|CHANNELS?\b[^\d]{0,12}?)(\d{1,2})X(\d{1,2}(?:\.\d{1,2})?)(?![\d/]|\.\d)/g,
+    triple: new RegExp(`${DSTART}${DN}X${DN}X(\\d{1,2} ?GA\\b|${DN.slice(1, -1)})${DNEND}`, 'g'),
+    pair: new RegExp(`${DSTART}${DN}X${DN}${DNEND}`, 'g'),
+    atlas: /\bMATERIAL ?:? ?(\d{1,2}(?:\.\d+)?)X(\.?\d{1,4}(?:\.\d+)?)(?:X(\.?\d{2,4}))?X\d{1,3}'/,
+    pipeSch: new RegExp(`${DSTART}${DN} ?(?:NPS|NB)? ?SCH(?:EDULE)?\\.? ?(\\d{1,3}S?|XX?S|STD)\\b`, 'g'),
+    npsSch: new RegExp(`\\bNPS ?${DN} ?(?:SCH(?:EDULE)?\\.? ?)?(\\d{1,3}S?|XX?S|STD)\\b`, 'g'),
+    schAfter: new RegExp(`\\b(?:SCH(?:EDULE)?\\.? ?|S)(10|20|30|40|60|80|100|120|140|160|XX?S|STD)\\b[^\\d]{0,20}?${DN}(?=X|\\s|$)`, 'g'),
+    odWall: new RegExp(`${DSTART}${DN} ?(?:O\\.?D\\.? ?)?X ?${DN}${DNEND}`, 'g'),
+    odWallWords: new RegExp(`\\bO\\.?D\\.?\\b[^\\d]{0,6}${DN}${DNEND}[^\\d]{0,15}\\b(?:WALL|WT|W\\.T\\.)[^\\d]{0,6}${DN}${DNEND}`, 'g'),
+    plateTWL: new RegExp(`${DSTART}${DN} (\\d{2,3}(?:\\.\\d+)?)X ?(\\d{2,3}(?:\\.\\d+)?)(?![\\d.])`, 'g'),
+    // N° de material de Steel & Pipe para plancha: 7 + grosor en 32avos + ancho + largo ("701272144" = 3/8 x 72 x 144)
+    spMaterial: /\b7(0[0-9]\d)(36|48|60|72|96|120)(\d{3})\b/g,
+    plateWord: new RegExp(`\\bPL(?:ATES?)?\\b\\.? ?${DN}${DNEND}`, 'g'),
+    thick: new RegExp(`\\bTHICK(?:NESS)?\\b[^\\d]{0,6}${DN}${DNEND}`, 'g'),
+    grade: /\b(?:ASTM ?)?S?A ?(36|283|285|514|516|529|572|588|606|656|709|786|1011|1018)(?![\d])(?: ?(?:GR(?:ADE)?\.? ?)?[- ]?(36|42|50|55|60|65|70|80|100)(?![\d]))?/g,
+    gauge: /\b(\d{1,2}|1I1) ?GA\b/,
+    rebar: /\bREBARS?\b[^#]{0,25}#(\d{1,2})\b|\b(?:SIZE|BAR) ?:? ?#(\d{1,2})\b/,
+    rebarMm: /\bREBARS?\b\D{0,6}(\d{2}) ?MM\b/,
+};
+
+function near(t, i, re, span = 40) {
+    re.lastIndex = 0;
+    return re.test(t.slice(Math.max(0, i - span), i));
+}
+
+// Pared sin punto ("375" en Atlas Tube = .375)
+const wallNum = v => (Number.isInteger(v) && v >= 100 && v < 1000 ? v / 1000 : v);
+
+function findTriple(t, ok, prefixRe) {
+    let fallback = null;
+    for (const m of dimMatches(t, DIM_RE.triple)) {
+        const a = dimNum(m[1]), b = dimNum(m[2]);
+        const ga = /GA$/.test(m[3]);
+        const c = ga ? null : wallNum(dimNum(m[3]));
+        if (!ok(a, b, c, ga)) continue;
+        const out = { dims: `${fmtDim(a)}x${fmtDim(b)}x${ga ? m[3].replace(' ', '') : fmtDim(c)}`, from: m[0] };
+        if (prefixRe && near(t, m.index, prefixRe, 25)) return out;
+        if (!fallback) fallback = out;
+    }
+    return fallback;
+}
+
+function plateGrade(t, i) {
+    const pick = s => {
+        const all = [...s.matchAll(DIM_RE.grade)];
+        const m = all.find(x => x[1] === '36' || x[1] === '786') || all[0];   // certificación doble: A36 primero
+        return m ? `A${m[1]}${m[2] && m[1] !== '36' && m[1] !== '786' ? '-' + m[2] : ''}` : null;
+    };
+    return pick(t.slice(Math.max(0, i - 80), i + 120)) || pick(t);
+}
+
+// Grosor delante de "72X144": si el OCR se comió la raya ("38" = 3/8, "12" = 1/2, "316" = 3/16) se recupera la fracción
+function plateFrac(s) {
+    const n = dimNum(s);
+    if (n <= 8 || !/^\d{2,3}$/.test(s)) return n;
+    const m = s.match(/^(\d{1,2})(2|4|8|16)$/);
+    return m && +m[1] < +m[2] && +m[1] % 2 === 1 ? +m[1] / +m[2] : n;
+}
+
+function pipeName(nps, sch) { return `${fmtDim(nps)}x${/^\d/.test(sch) ? 'SCH ' + sch : sch}`; }
+
+// Diámetro exterior + pared → tamaño nominal + cédula si coincide con la tabla; si no, se deja "OD x pared"
+function pipeFromOdWall(od, wall) {
+    const row = NPS_TABLE.find(r => Math.abs(r[1] - od) < 0.012);
+    if (row) {
+        const sch = Object.entries(row[2]).find(([, w]) => Math.abs(w - wall) <= 0.006);
+        if (sch) return pipeName(row[0], sch[0]);
+    }
+    return `${fmtDim(od)}x${fmtDim(wall)}`;
+}
+
+function pipeFromSizeSch(size, sch) {
+    const row = NPS_TABLE.find(r => Math.abs(r[1] - size) < 0.012 && r[0] !== size);   // "1.315" es el diámetro exterior de 1"
+    return pipeName(row ? row[0] : size, sch);
+}
+
+// Tipo a partir de una medida inconfundible: "Material: 3.0x3.0x.375" (tubo cuadrado), "Material: 1.660x.140x21'" (tubo
+// redondo = Pipe), "10X15.3#" (canal), "8X18#" (viga)
+function shapeFromSize(src) {
+    const t = dimsText(src);
+    const at = t.match(DIM_RE.atlas);
+    if (at) {
+        if (at[3] && +at[1] === dimNum(at[2])) return 'SQ Tube';
+        if (!at[3] && /\./.test(at[1])) return 'Pipe';
+    }
+    for (const m of dimMatches(t, DIM_RE.triple)) {      // "0.750 X 96.00 X 240.0" = plancha (ancho 24"–130", largo ≥ ancho)
+        const a = dimNum(m[1]), b = dimNum(m[2]), c = dimNum(m[3]);
+        if (a > 0 && a <= 8 && b >= 24 && b <= 130 && c >= b) return 'Plate';
+    }
+    for (const m of dimMatches(t, DIM_RE.weight)) {
+        const d = +m[1];
+        if (m[3] !== '#' && !(/4$/.test(m[2]) && (snapWeight(C_SHAPES, d, m[2]) != null || snapWeight(W_SHAPES, d, m[2]) != null) && !(C_SHAPES[d] || []).concat(W_SHAPES[d] || []).includes(+m[2]))) continue;
+        if (snapWeight(W_SHAPES, d, m[2]) != null && !(C_SHAPES[d] || []).includes(+m[2])) return 'Beam';
+        if (snapWeight(C_SHAPES, d, m[2]) != null) return 'Channel';
+    }
+    return null;
+}
+
+function shapeDims(t, table, preRes) {
+    for (const re of preRes) {
+        for (const m of dimMatches(t, re)) {
+            const d = +m[1];
+            const w = snapWeight(table, d, m[2]);
+            if (w != null) return { dims: `${d}x${fmtDim(w)}`, from: m[0] };
+        }
+    }
+    // con la letra pegada (W12X40, MC8X22.8) se acepta aunque el peso no esté en la tabla
+    for (const m of dimMatches(t, preRes[0])) {
+        const d = +m[1], w = +m[2];
+        if (/^(?:W|HP|S|M|WF|M?C) ?\d/.test(m[0]) && d >= 3 && d <= 44 && w >= 3 && w <= 999) return { dims: `${d}x${fmtDim(w)}`, from: m[0] };
+    }
+    return null;
+}
+
+function dimsFor(t, tipo) {
+    switch (tipo) {
+        case 'Beam':
+            return shapeDims(t, W_SHAPES, [DIM_RE.beamPre, DIM_RE.beamWord, DIM_RE.gerdau, DIM_RE.weight]);
+        case 'Channel':
+            return shapeDims(t, C_SHAPES, [DIM_RE.channelPre, DIM_RE.gerdau, DIM_RE.weight]);
+        case 'Angle':
+            return findTriple(t, (a, b, c, ga) => !ga && a >= 0.5 && a <= 12 && b >= 0.5 && b <= 12 && c > 0 && c <= 1.5 && c < Math.min(a, b),
+                /\bL ?$|\bANG(?:[LI1]ES?)?\b/);
+        case 'SQ Tube': {
+            const at = t.match(DIM_RE.atlas);
+            if (at && at[3] && +at[1] === dimNum(at[2])) {
+                return { dims: `${fmtDim(+at[1])}x${fmtDim(dimNum(at[2]))}x${fmtDim(wallNum(dimNum(at[3])))}`, from: at[0] };
+            }
+            const tr = findTriple(t, (a, b, c, ga) => a >= 0.5 && a <= 24 && b >= 0.5 && b <= 24 && (ga || (c > 0 && c <= 1 && c < Math.min(a, b))),
+                /\b(?:HSS|TS|SQ|TUBE|TUBING|SQUARE)\b ?$/);
+            if (tr) return tr;
+            const sq = t.match(new RegExp(`\\bSQUARE (?:BARS? )?${DN}${DNEND}`));   // barra cuadrada: "SQUARE 1/2"
+            if (sq) { const a = dimNum(sq[1]); if (a > 0 && a <= 12) return { dims: `${fmtDim(a)}x${fmtDim(a)}`, from: sq[0] }; }
+            return null;
+        }
+        case 'Flat Bar': {
+            let fallback = null;
+            for (const m of dimMatches(t, DIM_RE.pair)) {
+                const a = dimNum(m[1]), b = dimNum(m[2]);
+                if (!(a > 0 && a <= 2 && b > a && b <= 12)) continue;
+                const out = { dims: `${fmtDim(a)}x${fmtDim(b)}`, from: m[0] };
+                if (near(t, m.index, /\b(?:F[LI1]AT(?: ?BA[RT]S?)?|FB|FLT)\b/, 25)) return out;
+                if (!fallback) fallback = out;
+            }
+            return fallback;
+        }
+        case 'Pipe': {
+            const at = t.match(DIM_RE.atlas);
+            if (at && !at[3]) return { dims: pipeFromOdWall(+at[1], wallNum(dimNum(at[2]))), from: at[0] };
+            for (const re of [DIM_RE.pipeSch, DIM_RE.npsSch]) {
+                for (const m of dimMatches(t, re)) {
+                    const s = dimNum(m[1]);
+                    if (s > 0 && s <= 48) return { dims: pipeFromSizeSch(s, m[2]), from: m[0] };
+                }
+            }
+            for (const m of dimMatches(t, DIM_RE.schAfter)) {
+                const s = dimNum(m[2]);
+                if (s > 0 && s <= 48) return { dims: pipeFromSizeSch(s, m[1]), from: m[0] };
+            }
+            for (const re of [DIM_RE.odWallWords, DIM_RE.odWall]) {
+                for (const m of dimMatches(t, re)) {
+                    const od = dimNum(m[1]), wall = wallNum(dimNum(m[2]));
+                    if (od >= 0.4 && od <= 48 && wall > 0 && wall < 2 && wall <= od / 3) return { dims: pipeFromOdWall(od, wall), from: m[0] };
+                }
+            }
+            return null;
+        }
+        case 'Plate':
+        case 'Floor Plate': {
+            let found = null;
+            const tries = [
+                [DIM_RE.triple, m => { const a = dimNum(m[1]), b = dimNum(m[2]), c = dimNum(m[3]); return a > 0 && a <= 8 && b >= 12 && c >= 12 ? a : null; }],
+                [DIM_RE.pair, m => { const a = dimNum(m[1]), b = dimNum(m[2]); return a > 0 && a <= 3 && b >= 24 ? a : null; }],
+                [DIM_RE.plateTWL, m => { const a = plateFrac(m[1]); return a > 0 && a <= 8 && +m[2] >= 12 && +m[3] >= 12 ? a : null; }],
+                [DIM_RE.plateWord, m => { const a = dimNum(m[1]); return a > 0 && a <= 8 ? a : null; }],
+                [DIM_RE.thick, m => { const a = dimNum(m[1]); return a > 0 && a <= 8 ? a : null; }],
+                [DIM_RE.spMaterial, m => { const a = +m[1] / 32; return a > 0 && a <= 4 && +m[3] >= 96 ? a : null; }],
+            ];
+            for (const [re, get] of tries) {
+                for (const m of dimMatches(t, re)) {
+                    const n = get(m);
+                    if (n && plausiblePlate(n)) { found = { n, i: m.index, from: m[0] }; break; }
+                }
+                if (found) break;
+            }
+            if (!found) return null;
+            const grade = plateGrade(t, found.i);
+            // Tus planchas siempre llevan el grado: si el MTR no lo deja leer se asume A36 y se marca para revisar
+            if (!grade && tipo === 'Plate') return { dims: `${fmtPlate(found.n)}xA36`, from: found.from, gradeAssumed: true };
+            return { dims: `${fmtPlate(found.n)}${grade ? 'x' + grade : ''}`, from: found.from };
+        }
+        case 'HR Sheet': {
+            const m = t.match(DIM_RE.gauge);
+            return m ? { dims: `${m[1] === '1I1' ? 11 : +m[1]}GA`, from: m[0] } : null;
+        }
+        case 'Rebar': {
+            const m = t.match(DIM_RE.rebar);
+            if (m) return { dims: `#${+(m[1] || m[2])}`, from: m[0] };
+            const mm = t.match(DIM_RE.rebarMm);
+            if (mm && REBAR_MM[+mm[1]]) return { dims: `#${REBAR_MM[+mm[1]]}`, from: mm[0] };
+            return null;
+        }
+        default:
+            return null;
+    }
+}
+
+// Primero en la línea del producto; si no, en todo el texto
+function extractDims(rawText, tipo) {
+    if (!rawText || !DIM_TYPES.has(tipo)) return null;
+    const t = dimsText(rawText);
+    for (const src of [productText(t), t]) {
+        if (!src) continue;
+        const r = dimsFor(src, tipo);
+        if (r) return r;
+    }
+    return null;
+}
+
+const needsDims = p => !!p && DIM_TYPES.has(p.tipo) && !p.dims;
+
+function parseMTR(rawText, kb) {
+    const r = { ...extractFields(rawText, kb), ...decideType(rawText, kb) };
+    const d = extractDims(rawText, r.tipo);
+    return { ...r, dims: d ? d.dims : '', dimsFrom: d ? d.from : '' };
+}
+
+// ---------- Calidad del texto ----------
+function countKnownWords(text) {
+    const seen = new Set();
+    for (const w of String(text || '').toUpperCase().split(/[^A-Z]+/)) if (MTR_WORDS.has(w)) seen.add(w);
+    return seen.size;
+}
+
+function textQuality(text) {
+    const compact = String(text || '').replace(/\s+/g, '');
+    const good = (compact.match(/[A-Za-z0-9.,:;\/#%()\-+'"&*=°ÁÉÍÓÚÑÜáéíóúñü]/g) || []).length;
+    return { chars: compact.length, ratio: compact.length ? good / compact.length : 0, known: countKnownWords(text) };
+}
+
+// Texto nativo con fuentes rotas sale como "jeroglíficos": si no parece un MTR se ignora y se usa OCR.
+function isReadable(q) {
+    return q.chars >= MIN_NATIVE_CHARS && q.ratio >= 0.85 && q.known >= 2;
+}
+
+function featureTextOf(t) {
+    if (!t) return '';
+    return [t.nativeUsable ? t.native : '', t.ocr || ''].join('\n');
+}
+
+// Combina texto nativo y OCR: Heat/PO del sello de Steel & Pipe si lo hay; si no, del más confiable primero.
+// El tipo se decide con todo el texto legible.
+function interpretTexts(t, kb) {
+    const nat = t.nativeUsable ? extractFields(t.native, kb) : null;
+    const oc = t.ocr ? extractFields(t.ocr, kb) : null;
+    const order = t.preferOcr ? [oc, nat] : [nat, oc];
+    const pick = f => { for (const x of order) if (x && x[f] !== UNKNOWN) return x[f]; return UNKNOWN; };
+    const stamp = findStampInTexts(t);
+    const type = decideType(featureTextOf(t), kb);
+    // PO: el del sello manda. Sin sello, solo se acepta uno que parezca de Premier (6 cifras, empieza con 2).
+    let po = (stamp && stamp.po) || pick('po');
+    let poNote = '';
+    if (!(stamp && stamp.po) && !PREMIER_PO_RE.test(po)) {
+        const alt = premierPo([t.nativeUsable ? t.native : '', t.ocr]);
+        if (alt) po = alt;
+        else if (po !== UNKNOWN) {
+            poNote = `El MTR trae el PO ${po}, pero no parece de Premier (seguramente es el de Steel & Pipe con el molino). Escribe el PO de Premier.`;
+            po = UNKNOWN;
+        }
+    }
+    let d = null;
+    for (const src of t.preferOcr ? [t.ocr, t.nativeUsable ? t.native : ''] : [t.nativeUsable ? t.native : '', t.ocr]) {
+        d = extractDims(src, type.tipo);
+        if (d) break;
+    }
+    let heat = fixHeat((stamp && stamp.heat) || pick('heat'));
+    let heatNote = '';
+    if (heat === UNKNOWN) {
+        const th = tableHeat([t.nativeUsable ? t.native : '', t.ocr]);
+        if (th) { heat = fixHeat(th); heatNote = `El Heat ${heat} salió de la tabla del MTR (columna "Heat"). Revisa que sea ese y marca la casilla.`; }
+    }
+    return {
+        heat,
+        heatNote,
+        gradeAssumed: !!(d && d.gradeAssumed),
+        po,
+        poNote,
+        stamp,
+        ...type,
+        dims: d ? d.dims : '',
+        dimsFrom: d ? d.from : '',
+    };
+}
+
+function sourceLabel(t) {
+    if (!t) return '';
+    const rot = t.ocrRotation ? ` ${t.ocrRotation}°` : '';
+    const conf = t.ocrConfidence != null ? ` ${Math.round(t.ocrConfidence)}%` : '';
+    if (t.ocr == null) return t.nativeUsable ? 'Nativo' : (t.nativeQuality && t.nativeQuality.chars ? 'Nativo ilegible' : 'Sin texto');
+    if (!t.nativeUsable) return `OCR${rot}${conf}`;
+    return t.preferOcr ? `OCR${rot}${conf} + Nativo` : `Nativo + OCR${rot}${conf}`;
+}
+
+function buildDebugText(t) {
+    if (!t) return '(sin texto)';
+    const q = t.nativeQuality || { chars: 0 };
+    const state = t.nativeUsable ? 'legible' : (q.chars ? 'ILEGIBLE (jeroglíficos): se ignoró y se usó OCR' : 'sin texto: es un escaneo');
+    const parts = [`===== TEXTO NATIVO (${q.chars} caracteres · ${state}) =====`, (t.native || '').trim() || '(vacío)'];
+    if (t.ocr != null) {
+        const rot = t.ocrRotation ? ` · página girada ${t.ocrRotation}°` : '';
+        const conf = t.ocrConfidence != null ? ` · confianza ${Math.round(t.ocrConfidence)}%` : '';
+        const drop = t.ocrDropped ? ` · ${t.ocrDropped} palabra(s) ilegible(s) descartada(s): logos, firmas, manchas` : '';
+        parts.push('', `===== OCR página 1${rot}${conf}${drop} =====`, t.ocr.trim() || '(el OCR no encontró texto)');
+    }
+    if (t.stampText) {
+        const rot = t.stampRotation ? ` · hoja girada ${t.stampRotation}°` : '';
+        parts.push('', `===== BÚSQUEDA DEL SELLO STEEL & PIPE${rot} =====`, t.stampText.trim());
+    } else if (t.stampSearched) {
+        parts.push('', '===== BÚSQUEDA DEL SELLO STEEL & PIPE =====', '(no se encontró el sello en ninguna orientación)');
+    }
+    return parts.join('\n');
+}
+
+// ---------- Aprendizaje ----------
+function tidyType(s) {
+    const t = String(s || '').replace(/_+/g, ' ').replace(/\s+/g, ' ').trim();
+    if (!t) return '';
+    return KNOWN_TYPES.find(k => k.toLowerCase() === t.toLowerCase()) || TYPE_ALIASES.get(t.toLowerCase()) || t;
+}
+
+// "Channel 8x11.5" → tipo "Channel" + medidas "8x11.5" (las medidas son las últimas palabras con números y "x")
+const DIM_TOKEN_RE = /^(?:#\d{1,2}|\d{1,2}GA|\d{2}MM|SCH|XX?S|STD|(?=.*\d)[\d.]+(?:-\d+)?(?:x[\dA-Z.-]*)*)$/i;
+function splitTypeDims(s) {
+    const words = String(s || '').trim().split(/\s+/).filter(Boolean);
+    const dims = [];
+    while (words.length > 1 && DIM_TOKEN_RE.test(words[words.length - 1])) dims.unshift(words.pop());
+    return { tipo: tidyType(words.join(' ')), dims: dims.join(' ') };
+}
+
+// "Square Tube 4x4x0.25 Heat A123 PO 456.pdf" → {tipo, dims, heat, po}; o el tipo por la subcarpeta; o el nombre empieza con un tipo.
+function labelFromFileName(fileName, folder) {
+    const base = String(fileName || '').replace(/\.pdf$/i, '').replace(/\s*\(\d+\)\s*$/, '').replace(/\s+/g, ' ').trim();
+    const val = v => { const u = String(v || '').toUpperCase().trim(); return u && u !== UNKNOWN && u !== 'NOT KNOWN' ? u : null; };
+    const known = t => { const k = tidyType(t); return KNOWN_TYPES.includes(k) ? k : null; };
+    const m = base.match(/^(.+?) (?:HEAT|HT)\.? ?(\S+?)(?: ?PO ?(.+))?$/i);
+    if (m) {
+        const { tipo, dims } = splitTypeDims(m[1]);
+        const po = m[3] ? m[3].trim().split(/\s+/)[0] : null;
+        if (tipo) return { tipo, dims, heat: val(m[2]), po: /^NOT$/i.test(po || '') ? null : val(po) };
+    }
+    if (folder && known(folder)) return { tipo: known(folder), heat: null, po: null };
+    const up = base.toUpperCase();
+    const k = KNOWN_TYPES.find(t => up === t.toUpperCase() || up.startsWith(t.toUpperCase() + ' '));
+    return k ? { tipo: k, heat: null, po: null } : null;
+}
+
+// Palabras que describen el documento (sin números largos como heats, POs o fechas)
+function featureTokens(seq, exclude) {
+    const out = new Set();
+    for (const t of seq) {
+        if (t.length < 2 || t.length > 24) continue;
+        if (!/[A-Z]/.test(t)) continue;
+        if ((t.match(/\d/g) || []).length >= 5) continue;
+        if (exclude && exclude.has(t)) continue;
+        if (FEATURE_STOP.has(t)) continue;
+        out.add(t);
+        if (out.size >= ML.MAX_TOKENS) break;
+    }
+    return [...out];
+}
+
+// Qué palabra usa ese molino justo antes del valor (ej. "CAST" en "CAST NO. 12345")
+function findValueLabel(seq, value) {
+    const idx = seq.findIndex(t => t === value || t.endsWith('-' + value));
+    if (idx < 0) return null;
+    for (let j = idx - 1; j >= Math.max(0, idx - 3); j--) {
+        const t = seq[j];
+        if (LABEL_FILLER.has(t)) continue;
+        if (FIELD_LABELS.has(t)) return null;              // ya lo cubren las reglas normales
+        if (/^[A-Z]{2,15}$/.test(t) && !LABEL_STOP.has(t)) return t;
+        return null;
+    }
+    return null;
+}
+
+function makeExample(text, label, meta = {}) {
+    const seq = tokenize(text);
+    const exclude = new Set([label.heat, label.po].filter(Boolean));
+    return {
+        ...meta,
+        tipo: label.tipo,
+        heat: label.heat || null,
+        po: label.po || null,
+        tokens: featureTokens(seq, exclude),
+        heatLabel: label.heat ? findValueLabel(seq, label.heat) : null,
+        poLabel: label.po ? findValueLabel(seq, label.po) : null,
+        date: new Date().toISOString().slice(0, 10),
+    };
+}
+
+// Modelo: para cada palabra, qué tan típica es de un tipo frente a los demás (tasas, no conteos:
+// así un tipo con muchos ejemplos no aplasta a uno con pocos). Solo se usan palabras que de verdad distinguen.
+function trainTypeModel(byClass) {
+    const classes = [...byClass.keys()];
+    const sizes = new Map(classes.map(c => [c, byClass.get(c).length]));
+    const total = [...sizes.values()].reduce((a, b) => a + b, 0);
+    const df = new Map();
+    for (const [c, docs] of byClass) {
+        for (const d of docs) for (const t of d) {
+            let m = df.get(t);
+            if (!m) df.set(t, m = new Map());
+            m.set(c, (m.get(c) || 0) + 1);
+        }
+    }
+    const weights = new Map();
+    for (const [t, m] of df) {
+        let row = null;
+        let all = 0;
+        for (const n of m.values()) all += n;
+        for (const c of classes) {
+            const Nc = sizes.get(c);
+            const No = total - Nc;
+            const nc = m.get(c) || 0;
+            const p = (nc + ML.ALPHA) / (Nc + 2 * ML.ALPHA);
+            const q = (all - nc + ML.ALPHA) / (No + 2 * ML.ALPHA);
+            if (Math.abs(p - q) < ML.MIN_DIFF) continue;
+            if (!row) row = new Map();
+            row.set(c, Math.log(p / q));
+        }
+        if (row) weights.set(t, row);
+    }
+    return { classes, sizes, weights };
+}
+
+function predictType(model, tokens) {
+    if (!model || !tokens || !tokens.length) return null;
+    const scores = new Map(model.classes.map(c => [c, 0]));
+    const contrib = new Map(model.classes.map(c => [c, []]));
+    let used = 0;
+    for (const t of new Set(tokens)) {
+        const row = model.weights.get(t);
+        if (!row) continue;
+        used++;
+        for (const [c, w] of row) {
+            scores.set(c, scores.get(c) + w);
+            if (w > 0) contrib.get(c).push([t, w]);
+        }
+    }
+    if (!used) return null;
+    const sorted = [...scores].sort((a, b) => b[1] - a[1]);
+    const top = sorted[0][1];
+    const exps = sorted.map(([, s]) => Math.exp((s - top) / ML.TEMP));
+    const z = exps.reduce((a, b) => a + b, 0);
+    const why = contrib.get(sorted[0][0]).sort((a, b) => b[1] - a[1]).slice(0, 4).map(x => x[0]);
+    return {
+        tipo: sorted[0][0],
+        conf: exps[0] / z,
+        margin: sorted.length > 1 ? top - sorted[1][1] : top,
+        second: sorted.length > 1 ? sorted[1][0] : null,
+        why,
+        used,
+    };
+}
+
+function topIndicators(model, tipo, n = 12) {
+    const out = [];
+    for (const [t, row] of model.weights) { const w = row.get(tipo); if (w > 0) out.push([t, w]); }
+    return out.sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).slice(0, n).map(x => x[0]);
+}
+
+function escapeRe(s) { return s.replace(/[.*+?^${}()|[\]\\\/]/g, '\\$&'); }
+
+// reglas-tipo.txt → [{tipo, raw, re}]
+function parseTypeRules(text) {
+    const rules = [];
+    for (const line of String(text || '').split(/\r?\n/)) {
+        const l = line.trim();
+        if (!l || l.startsWith('#')) continue;
+        const m = l.match(/^([^:=]+?)\s*[:=]\s*(.+)$/);
+        if (!m) continue;
+        const tipo = tidyType(m[1]);
+        if (!tipo) continue;
+        for (const kw of m[2].split(',')) {
+            const k = normalizeText(kw).trim();
+            if (!k) continue;
+            const src = k.split(' ').map(escapeRe).join(' ?');
+            rules.push({ tipo, raw: kw.trim(), re: new RegExp('(?<![A-Z0-9])' + src + '(?![A-Z0-9])') });
+        }
+    }
+    return rules;
+}
+
+function buildKnowledge(examples, rulesText) {
+    const list = (examples || []).filter(e => e && e.tipo && Array.isArray(e.tokens)).map(e => ({ ...e, tipo: tidyType(e.tipo) }));
+    const countLabels = field => {
+        const m = new Map();
+        for (const e of list) { const l = e[field + 'Label']; if (l) m.set(l, (m.get(l) || 0) + 1); }
+        return [...m].sort((a, b) => b[1] - a[1]).map(([label, count]) => ({ label, count }));
+    };
+    const byClass = new Map();
+    for (const e of list) {
+        if (!byClass.has(e.tipo)) byClass.set(e.tipo, []);
+        byClass.get(e.tipo).push(new Set(e.tokens));
+    }
+    return {
+        rules: parseTypeRules(rulesText),
+        labels: { heat: countLabels('heat'), po: countLabels('po') },
+        model: byClass.size >= 2 ? trainTypeModel(byClass) : null,
+        stats: { examples: list.length, perClass: Object.fromEntries([...byClass].map(([c, d]) => [c, d.length])) },
+    };
+}
+
+// ---------- Nombres ----------
+function sanitizeFileName(name) {
+    let n = String(name || '')
+        .replace(/[<>:"/\\|?*\u0000-\u001F]/g, '')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .replace(/(?:\.pdf)+$/i, '')
+        .trim()
+        .slice(0, 180)
+        .replace(/[. ]+$/, '');
+    if (!n) return '';
+    if (/^(?:CON|PRN|AUX|NUL|COM\d|LPT\d)$/i.test(n)) n = '_' + n;
+    return n + '.pdf';
+}
+
+function generateFileName(p) {
+    return sanitizeFileName(`${p.tipo}${p.dims ? ' ' + p.dims : ''} Heat ${p.heat} PO ${p.po}`);
+}
+
+// Nombre final de cada archivo SIN pisar ningún archivo existente ni a otro de la lista.
+function planRenames(items, takenNamesLower) {
+    const taken = new Set(takenNamesLower);
+    const plan = new Map();
+    for (const it of items) {
+        if (it.status !== 'ready' || !it.include) continue;
+        const clean = sanitizeFileName(it.newName);
+        if (!clean) { plan.set(it.id, { invalid: true }); continue; }
+        if (clean === it.name) { plan.set(it.id, { same: true, target: clean }); continue; }
+        const own = it.name.toLowerCase();
+        const base = clean.slice(0, -4);
+        let target = clean;
+        for (let n = 2; taken.has(target.toLowerCase()) && target.toLowerCase() !== own; n++) {
+            target = `${base} (${n}).pdf`;
+        }
+        if (target === it.name) { plan.set(it.id, { same: true, target }); continue; }
+        plan.set(it.id, { target, renamed: target !== clean });
+        taken.delete(own);
+        taken.add(target.toLowerCase());
+    }
+    return plan;
+}
+
+// ---------- Archivos ----------
+async function listNamesLower(dir) {
+    const names = new Set();
+    for await (const name of dir.keys()) names.add(name.toLowerCase());
+    return names;
+}
+
+async function fileExists(dir, name) {
+    try { await dir.getFileHandle(name); return true; }
+    catch (err) { return !!(err && err.name === 'TypeMismatchError'); } // existe una carpeta con ese nombre
+}
+
+async function exactNameExists(dir, name) {
+    for await (const key of dir.keys()) if (key === name) return true;
+    return false;
+}
+
+async function readTextFile(dir, name) {
+    try {
+        const h = await dir.getFileHandle(name);
+        return await (await h.getFile()).text();
+    } catch (err) {
+        if (err && err.name === 'NotFoundError') return null;
+        throw err;
+    }
+}
+
+async function writeTextFile(dir, name, content) {
+    const h = await dir.getFileHandle(name, { create: true });
+    const w = await h.createWritable();
+    try { await w.write(content); await w.close(); }
+    catch (err) { try { await w.abort(); } catch (_) { /* nada */ } throw err; }
+}
+
+// Copia un archivo y verifica el tamaño. Si algo falla, borra la copia a medias.
+async function copyVerified(dir, file, name) {
+    if (await fileExists(dir, name)) throw new Error(`Ya existe un archivo llamado "${name}".`);
+    const handle = await dir.getFileHandle(name, { create: true });
+    let ok = false;
+    try {
+        const writable = await handle.createWritable();
+        try {
+            await writable.write(file);
+            await writable.close();
+        } catch (err) {
+            try { await writable.abort(); } catch (_) { /* nada */ }
+            throw err;
+        }
+        const written = await handle.getFile();
+        if (written.size !== file.size) throw new Error('La copia quedó incompleta; el original no se tocó.');
+        ok = true;
+    } finally {
+        if (!ok) { try { await dir.removeEntry(name); } catch (_) { /* nada */ } }
+    }
+}
+
+// Renombra sin perder datos: nunca sobrescribe; usa move() si existe; si no, copia + verifica + borra
+// (y deshace si no puede borrar). Cambios solo de mayúsculas pasan por un nombre temporal.
+async function safeRename(dir, handle, oldName, newName) {
+    if (oldName === newName) return 'none';
+    const caseOnly = oldName.toLowerCase() === newName.toLowerCase();
+    const taken = caseOnly ? await exactNameExists(dir, newName) : await fileExists(dir, newName);
+    if (taken) throw new Error(`Ya existe un archivo llamado "${newName}".`);
+
+    if (typeof handle.move === 'function') {
+        try {
+            await handle.move(newName);
+            return 'move';
+        } catch (err) {
+            if ((await exactNameExists(dir, newName)) && !(await exactNameExists(dir, oldName))) return 'move';
+        }
+    }
+
+    const file = await handle.getFile();
+    if (caseOnly) {
+        const tmp = `~mtr-tmp-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}.pdf`;
+        await copyVerified(dir, file, tmp);
+        try { await dir.removeEntry(oldName); }
+        catch (err) { try { await dir.removeEntry(tmp); } catch (_) { /* nada */ } throw err; }
+        const tmpFile = await (await dir.getFileHandle(tmp)).getFile();
+        try { await copyVerified(dir, tmpFile, newName); }
+        catch (err) { err.message += ` (el contenido quedó a salvo en "${tmp}")`; throw err; }
+        await dir.removeEntry(tmp);
+    } else {
+        await copyVerified(dir, file, newName);
+        try { await dir.removeEntry(oldName); }
+        catch (err) { try { await dir.removeEntry(newName); } catch (_) { /* nada */ } throw err; }
+    }
+    return 'copy';
+}
+
+function friendlyError(err) {
+    const name = (err && err.name) || '';
+    const msg = (err && err.message) || String(err);
+    switch (name) {
+        case 'PasswordException': return 'El PDF está protegido con contraseña.';
+        case 'InvalidPDFException': return 'El archivo no es un PDF válido o está dañado.';
+        case 'MissingPDFException': return 'No se encontró el PDF.';
+        case 'NotReadableError': return 'No se pudo leer: está abierto en otro programa o cambió mientras se leía.';
+        case 'NotAllowedError':
+        case 'SecurityError': return 'El navegador negó el permiso para esta carpeta.';
+        case 'NotFoundError': return 'El archivo ya no existe en la carpeta.';
+        case 'NoModificationAllowedError': return 'El archivo está bloqueado (¿abierto en Adobe u otro programa?).';
+        case 'QuotaExceededError': return 'No hay espacio suficiente en el disco.';
+        default: return msg;
+    }
+}
+/* CORE-END */
+
+/* ============================== LIBRERÍAS ============================== */
+const libs = {
+    pdf: typeof window.pdfjsLib !== 'undefined',
+    ocr: typeof window.Tesseract !== 'undefined' && typeof window.Tesseract.createWorker === 'function',
+};
+if (libs.pdf) pdfjsLib.GlobalWorkerOptions.workerSrc = PDFJS_WORKER;
+
+const capText = s => (s && s.length > CONFIG.MAX_TEXT_CHARS ? s.slice(0, CONFIG.MAX_TEXT_CHARS) : s);
+
+/* ============================== OCR ============================== */
+const ocr = { promise: null, jobs: 0, idleTimer: null, onLog: null };
+
+function getOcrWorker() {
+    clearTimeout(ocr.idleTimer);
+    if (!ocr.promise) {
+        ocr.jobs = 0;
+        ocr.promise = Tesseract.createWorker('eng', 1, {
+            logger: m => { if (ocr.onLog) ocr.onLog(m); },
+            errorHandler: err => console.error('Tesseract:', err),
+        }).catch(err => { ocr.promise = null; throw err; });
+    }
+    return ocr.promise;
+}
+
+async function terminateOcr() {
+    clearTimeout(ocr.idleTimer);
+    const pending = ocr.promise;
+    ocr.promise = null;
+    if (pending) {
+        try { const worker = await pending; await worker.terminate(); } catch (_) { /* nada */ }
+    }
+}
+
+function scheduleOcrShutdown() {
+    clearTimeout(ocr.idleTimer);
+    if (ocr.promise) ocr.idleTimer = setTimeout(terminateOcr, CONFIG.OCR_IDLE_MS);
+}
+
+// Los logos, firmas, sellos de tinta y manchas el OCR los "lee" como jeroglíficos con muy poca seguridad.
+// Se arma el texto solo con las palabras que leyó con seguridad; las que tienen números se cuidan más
+// porque pueden ser un Heat o un PO.
+function keepOcrWord(text, conf) {
+    const t = String(text || '').trim();
+    if (!t) return false;
+    const c = Number(conf);
+    if (!Number.isFinite(c)) return true;
+    if (c >= CONFIG.OCR_KEEP_CONF) return true;
+    return /\d/.test(t) && c >= CONFIG.OCR_KEEP_DIGITS_CONF;
+}
+
+function cleanOcrText(data) {
+    const raw = (data && data.text) || '';
+    const lines = data && Array.isArray(data.lines) ? data.lines : null;
+    if (!lines || !lines.length || !lines.some(l => Array.isArray(l.words))) return { text: raw, dropped: 0 };
+    let dropped = 0;
+    let total = 0;
+    const out = [];
+    for (const line of lines) {
+        const words = Array.isArray(line.words) ? line.words : [];
+        const kept = words.filter(w => {
+            if (w && String(w.text || '').trim()) total++;
+            const ok = w && keepOcrWord(w.text, w.confidence);
+            if (!ok && w && String(w.text || '').trim()) dropped++;
+            return ok;
+        });
+        const s = kept.map(w => String(w.text).trim()).join(' ');
+        if (s) out.push(s);
+    }
+    // Si casi todo salió "dudoso" (escaneo muy malo o la hoja de lado), se usa el texto completo como antes
+    if (dropped > total * 0.5) return { text: raw, dropped: 0 };
+    return { text: out.join('\n'), dropped };
+}
+
+// Escala de grises + estirar contraste: ayuda con escaneos desteñidos y papel de color.
+function enhanceForOcr(ctx, w, h) {
+    let img;
+    try { img = ctx.getImageData(0, 0, w, h); } catch (_) { return; }
+    if (!img || !img.data) return;
+    const d = img.data;
+    const hist = new Uint32Array(256);
+    for (let i = 0; i < d.length; i += 4) {
+        const g = (d[i] * 77 + d[i + 1] * 150 + d[i + 2] * 29) >> 8;
+        d[i] = g;
+        hist[g]++;
+    }
+    const n = w * h;
+    let lo = 0, hi = 255, acc = 0;
+    for (let v = 0; v < 256; v++) { acc += hist[v]; if (acc >= n * 0.005) { lo = v; break; } }
+    acc = 0;
+    for (let v = 0; v < 256; v++) { acc += hist[v]; if (acc >= n * 0.95) { hi = v; break; } }
+    if (hi - lo < 40) { lo = 0; hi = 255; }
+    const lut = new Uint8ClampedArray(256);
+    for (let v = 0; v < 256; v++) lut[v] = (v - lo) * 255 / (hi - lo);
+    for (let i = 0; i < d.length; i += 4) { const g = lut[d[i]]; d[i] = g; d[i + 1] = g; d[i + 2] = g; }
+    ctx.putImageData(img, 0, 0);
+}
+
+async function ocrRender(page, rotDelta, onProgress, { dpi = CONFIG.OCR_DPI, psm = CONFIG.MAIN_PSM, kind = 'ocr' } = {}) {
+    if (ocr.jobs >= CONFIG.OCR_RECYCLE_EVERY) await terminateOcr();
+    const rotation = ((page.rotate || 0) + rotDelta) % 360;
+    const base = page.getViewport({ scale: 1, rotation });
+    const scale = Math.max(0.5, Math.min(dpi / 72, CONFIG.OCR_MAX_SIDE / Math.max(base.width, base.height)));
+    const viewport = page.getViewport({ scale, rotation });
+    const canvas = document.createElement('canvas');
+    try {
+        canvas.width = Math.ceil(viewport.width);
+        canvas.height = Math.ceil(viewport.height);
+        const ctx = canvas.getContext('2d', { alpha: false, willReadFrequently: true });
+        if (!ctx) throw new Error('El navegador no pudo crear la imagen para el OCR (poca memoria).');
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        await page.render({ canvasContext: ctx, viewport }).promise;
+        enhanceForOcr(ctx, canvas.width, canvas.height);
+
+        ocr.onLog = m => {
+            if (!onProgress || !m) return;
+            if (m.status === 'recognizing text') onProgress({ status: kind, progress: m.progress, rot: rotDelta });
+            else if (/load|initializ/i.test(m.status || '')) onProgress({ status: 'loading', progress: m.progress });
+        };
+        if (onProgress && !ocr.promise) onProgress({ status: 'loading', progress: 0 });
+        const worker = await getOcrWorker();
+        await worker.setParameters({ tessedit_pageseg_mode: psm });
+        // rotateAuto endereza escaneos ligeramente torcidos
+        const { data } = await worker.recognize(canvas, { rotateAuto: true });
+        ocr.jobs++;
+        const { text, dropped } = cleanOcrText(data);
+        return { text, dropped, confidence: Number(data && data.confidence) || 0, known: countKnownWords(text) };
+    } finally {
+        ocr.onLog = null;
+        canvas.width = 0;   // libera la memoria de la imagen
+        canvas.height = 0;
+    }
+}
+
+// OCR de una página. Si la lectura sale mala prueba la página girada 90°, 270° y 180° y se queda con la mejor.
+async function ocrPage(pdf, pageNum, onProgress) {
+    const page = await pdf.getPage(pageNum);
+    try {
+        let best = null;
+        for (const rot of [0, 90, 270, 180]) {
+            if (rot && onProgress) onProgress({ status: 'rotate', rot });
+            const r = await ocrRender(page, rot, onProgress);
+            r.rot = rot;
+            r.score = r.confidence + 8 * r.known;
+            if (!best || r.score > best.score) best = r;
+            const good = r.known >= 5 || (r.known >= 3 && r.confidence >= 55);
+            if (good) break;
+        }
+        return best;
+    } finally {
+        page.cleanup();
+    }
+}
+
+// Busca el sello de Steel & Pipe en la página 1. El sello va derecho en la hoja aunque el MTR venga de lado,
+// así que se prueba la hoja derecha, de cabeza y de lado, con el modo "texto suelto". Se detiene al encontrarlo.
+async function searchStamp(pdf, pageNum, onProgress) {
+    const page = await pdf.getPage(pageNum);
+    try {
+        for (const rot of [0, 180, 90, 270]) {
+            if (onProgress) onProgress({ status: 'stamp', rot, progress: 0 });
+            const r = await ocrRender(page, rot, onProgress, { dpi: CONFIG.STAMP_DPI, psm: CONFIG.STAMP_PSM, kind: 'stamp' });
+            const stamp = findStamp(r.text);
+            if (stamp) return { text: r.text, rot, stamp };
+        }
+        return null;
+    } finally {
+        page.cleanup();
+    }
+}
+
+/* ============================== LECTURA DE PDF ============================== */
+// Convierte los trozos de texto que da pdf.js en renglones legibles:
+// agrupa por orientación (páginas giradas), luego por renglón según la altura,
+// ordena de izquierda a derecha y pone espacio solo donde hay hueco (no parte palabras en dos).
+function itemsToText(items) {
+    const groups = new Map();
+    for (const it of items || []) {
+        if (!it || typeof it.str !== 'string' || !it.str.trim() || !Array.isArray(it.transform)) continue;
+        const [a, b, c, d, e, f] = it.transform;
+        const ang = Math.round(Math.atan2(b, a) / (Math.PI / 2)) & 3;   // 0°, 90°, 180°, 270°
+        const cos = [1, 0, -1, 0][ang];
+        const sin = [0, 1, 0, -1][ang];
+        const size = Math.hypot(c, d) || Number(it.height) || 10;
+        if (!groups.has(ang)) groups.set(ang, []);
+        groups.get(ang).push({
+            str: it.str,
+            x: e * cos + f * sin,        // posición a lo largo del renglón
+            y: -e * sin + f * cos,       // altura del renglón (mayor = más arriba)
+            w: Math.abs(Number(it.width) || 0),
+            size,
+        });
+    }
+
+    // Primero la orientación con más texto
+    const ordered = [...groups.values()].sort((g1, g2) =>
+        g2.reduce((n, p) => n + p.str.length, 0) - g1.reduce((n, p) => n + p.str.length, 0));
+
+    const out = [];
+    for (const parts of ordered) {
+        parts.sort((p, q) => q.y - p.y || p.x - q.x);
+        const lines = [];
+        for (const p of parts) {
+            const line = lines[lines.length - 1];
+            if (line && Math.abs(line.y - p.y) <= Math.max(line.size, p.size) * 0.5) {
+                line.parts.push(p);
+                line.size = Math.max(line.size, p.size);
+            } else {
+                lines.push({ y: p.y, size: p.size, parts: [p] });
+            }
+        }
+        for (const line of lines) {
+            line.parts.sort((p, q) => p.x - q.x);
+            let s = '';
+            let prev = null;
+            for (const p of line.parts) {
+                if (prev) {
+                    const gap = p.x - (prev.x + prev.w);
+                    const glued = prev.w > 0 && gap < Math.min(prev.size, p.size) * 0.15;
+                    if (!glued && !/\s$/.test(s) && !/^\s/.test(p.str)) s += ' ';
+                }
+                s += p.str;
+                prev = p;
+            }
+            out.push(s.replace(/\s+/g, ' ').trim());
+        }
+    }
+    return out.filter(Boolean).join('\n');
+}
+
+async function readNativeText(pdf, kb) {
+    const maxPages = Math.min(pdf.numPages, CONFIG.MAX_NATIVE_PAGES);
+    let text = '';
+    for (let p = 1; p <= maxPages; p++) {
+        const page = await pdf.getPage(p);
+        try {
+            const content = await page.getTextContent();
+            text += itemsToText(content.items) + '\n';
+            // Sellos puestos como "nota" o cuadro de texto sobre el PDF (no salen en el texto normal)
+            try {
+                const notes = [];
+                for (const a of await page.getAnnotations()) {
+                    if (!a) continue;
+                    const s = (a.contentsObj && a.contentsObj.str) || a.contents
+                        || (Array.isArray(a.textContent) ? a.textContent.join('\n') : '');
+                    if (typeof s === 'string' && s.trim()) notes.push(s.trim());
+                }
+                if (notes.length) text += notes.join('\n') + '\n';
+            } catch (_) { /* sin notas */ }
+        } finally {
+            page.cleanup();
+        }
+        const f = extractFields(text, kb);
+        if (f.heat !== UNKNOWN && f.po !== UNKNOWN) break;
+    }
+    return text;
+}
+
+// Devuelve los textos (nativo y/o OCR) de un PDF. La interpretación se hace aparte (interpretTexts),
+// así se puede volver a interpretar al instante cuando cambia lo aprendido, sin volver a leer el PDF.
+async function analyzePdf(file, { forceOcr = false, onProgress, kb = null, stampSearch = true } = {}) {
+    if (file.size === 0) throw new Error('El archivo está vacío (0 bytes).');
+    if (file.size > CONFIG.MAX_FILE_MB * 1024 * 1024) throw new Error(`El archivo pesa más de ${CONFIG.MAX_FILE_MB} MB.`);
+
+    const data = new Uint8Array(await file.arrayBuffer());
+    // isEvalSupported:false cierra una vulnerabilidad conocida de esta versión de pdf.js
+    const task = pdfjsLib.getDocument({ data, isEvalSupported: false });
+    try {
+        const pdf = await task.promise;
+        if (onProgress) onProgress({ status: 'native' });
+        const nativeText = await readNativeText(pdf, kb);
+        const quality = textQuality(nativeText);
+        const texts = {
+            native: capText(nativeText),
+            nativeUsable: isReadable(quality),
+            nativeQuality: quality,
+            ocr: null, ocrConfidence: null, ocrRotation: 0,
+            preferOcr: !!forceOcr,
+            stampText: null, stampRotation: 0, stampSearched: false,
+        };
+        let warning = '';
+        const nf = texts.nativeUsable ? extractFields(nativeText, kb) : null;
+        const ns = texts.nativeUsable ? findStamp(nativeText) : null;
+        const complete = !!nf && ((nf.heat !== UNKNOWN && nf.po !== UNKNOWN) || !!(ns && ns.heat && ns.po));
+
+        if (!complete || forceOcr) {
+            if (!libs.ocr) {
+                warning = 'OCR no disponible (no cargó la librería). Revisa internet y recarga la página.';
+            } else {
+                try {
+                    const r = await ocrPage(pdf, 1, onProgress);
+                    texts.ocr = capText(r.text);
+                    texts.ocrConfidence = r.confidence;
+                    texts.ocrRotation = r.rot;
+                    texts.ocrDropped = r.dropped || 0;
+                } catch (err) {
+                    console.warn('OCR falló en', file.name, err);
+                    await terminateOcr();
+                    warning = 'El OCR falló: ' + friendlyError(err);
+                }
+            }
+        }
+
+        // Sello de Steel & Pipe: si no salió en lo leído, se busca aparte en la hoja (en escaneos, o si el MTR
+        // es para Steel & Pipe y el sello pudiera venir como imagen).
+        const soldToSP = /STEEL ?(?:AND|&) ?PIPE/.test(normalizeText(nativeText + '\n' + (texts.ocr || '')));
+        const have = findStampInTexts(texts);
+        if (stampSearch && libs.ocr && !warning && (texts.ocr != null || soldToSP) && !(have && have.po && have.heat)) {
+            try {
+                const s = await searchStamp(pdf, 1, onProgress);
+                texts.stampSearched = true;
+                if (s) { texts.stampText = capText(s.text); texts.stampRotation = s.rot; }
+            } catch (err) {
+                console.warn('Búsqueda del sello falló en', file.name, err);
+                await terminateOcr();
+            }
+        }
+        // Segunda lectura (otro modo de Tesseract) solo si con la primera faltan las medidas o el tipo
+        if (texts.ocr != null && libs.ocr && !warning) {
+            const missing = () => { const p0 = interpretTexts(texts, kb); return needsDims(p0) || p0.tipoSource === 'asumido'; };
+            if (missing()) {
+                const page = await pdf.getPage(1);
+                try {
+                    for (const psm of CONFIG.EXTRA_PSMS) {
+                        const r2 = await ocrRender(page, texts.ocrRotation || 0, onProgress, { psm, kind: 'ocr2' });
+                        if (r2.text.trim()) { texts.ocr = capText(texts.ocr + '\n' + r2.text); texts.ocrExtra = (texts.ocrExtra || 0) + 1; }
+                        if (!missing()) break;
+                    }
+                } catch (err) {
+                    console.warn('Lectura extra falló en', file.name, err);
+                    await terminateOcr();
+                } finally {
+                    page.cleanup();
+                }
+            }
+        }
+        const ocrIsMain = texts.ocr != null && (!texts.nativeUsable || forceOcr);
+        if (!warning && ocrIsMain && texts.ocrConfidence < CONFIG.OCR_WARN_CONF) {
+            warning = `Lectura de baja calidad (confianza ${Math.round(texts.ocrConfidence)}%): revisa Heat, PO y tipo.`;
+        }
+        return { texts, warning };
+    } finally {
+        try { await task.destroy(); } catch (_) { /* nada */ }   // libera memoria del PDF
+    }
+}
+
+/* ============================== ALMACÉN LOCAL (recordar la carpeta de entrenamiento) ============================== */
+const kv = {
+    db: null,
+    async open() {
+        if (typeof indexedDB === 'undefined') return null;
+        if (!this.db) {
+            this.db = await new Promise((res, rej) => {
+                const r = indexedDB.open('mtr-renamer', 1);
+                r.onupgradeneeded = () => r.result.createObjectStore('kv');
+                r.onsuccess = () => res(r.result);
+                r.onerror = () => rej(r.error);
+            });
+        }
+        return this.db;
+    },
+    async get(key) {
+        try {
+            const db = await this.open();
+            if (!db) return null;
+            return await new Promise((res, rej) => {
+                const q = db.transaction('kv').objectStore('kv').get(key);
+                q.onsuccess = () => res(q.result == null ? null : q.result);
+                q.onerror = () => rej(q.error);
+            });
+        } catch (err) { console.warn('kv.get', err); return null; }
+    },
+    async set(key, val) {
+        try {
+            const db = await this.open();
+            if (!db) return;
+            await new Promise((res, rej) => {
+                const tx = db.transaction('kv', 'readwrite');
+                tx.objectStore('kv').put(val, key);
+                tx.oncomplete = () => res();
+                tx.onerror = () => rej(tx.error);
+            });
+        } catch (err) { console.warn('kv.set', err); }
+    },
+};
+
+/* ============================== ESTADO ============================== */
+const state = {
+    dir: null,
+    items: [],
+    existing: new Set(),
+    plan: new Map(),
+    busy: false,
+    applying: false,
+    cancel: false,
+    filter: 'all',
+    seq: 0,
+    onlyNew: true,        // solo PDFs "Premier North Lot_…"
+    skippedNamed: 0,      // PDFs que ya tienen nombre y se dejaron fuera
+    // aprendizaje
+    trainDir: null,
+    trainPerm: 'none',
+    memory: null,
+    rulesText: '',
+    kb: null,
+    trainInfo: null,
+    learnApplied: true,
+    watchNew: true,       // vigilar la carpeta y analizar los escaneos que lleguen
+    ignored: new Set(),   // nombres que quitaste de la lista (no se vuelven a agregar solos)
+    savedDir: null,       // última carpeta usada (se recuerda entre visitas)
+};
+
+const $ = id => document.getElementById(id);
+const el = {
+    envErrors: $('env-errors'), envWarnings: $('env-warnings'),
+    folderZone: $('folder-zone'), folderTitle: $('folder-title'),
+    learnStatus: $('learn-status'), learnSub: $('learn-sub'), learnActions: $('learn-actions'), learnApplied: $('learn-applied'),
+    progress: $('progress-panel'), progressTitle: $('progress-title'), progressFile: $('progress-file'),
+    progressBar: $('progress-bar'), progressSub: $('progress-sub'), cancelBtn: $('cancel-btn'),
+    results: $('results-container'), fileCount: $('file-count'), folderName: $('folder-name'),
+    rescanBtn: $('rescan-btn'), applyBtn: $('apply-changes-btn'), applyCount: $('apply-count'),
+    stats: $('stats'), filter: $('filter'), emptyMsg: $('empty-msg'), list: $('files-list-container'),
+    onlyNew: $('only-new'), namedInfo: $('named-info'),
+    resumeBar: $('resume-bar'), resumeName: $('resume-name'), resumeBtn: $('resume-btn'), watchNew: $('watch-new'), watchInfo: $('watch-info'),
+    debugModal: $('debug-modal'), debugName: $('debug-name'), debugSource: $('debug-source'),
+    debugFields: $('debug-fields'), debugContent: $('debug-content'), debugCopy: $('debug-copy'),
+    learnModal: $('learn-modal'), learnContent: $('learn-content'),
+    toasts: $('toasts'),
+};
+
+function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+function newItem(name, handle) {
+    return {
+        id: 'f' + (++state.seq), name, handle, status: 'pending',
+        parsed: null, texts: null, newName: '', include: false, userToggled: false, nameEdited: false,
+        source: '', warning: '', error: '', renameError: '', oldName: '', removed: false,
+    };
+}
+
+function needsReview(it) {
+    return it.status === 'ready' && (/UNKNOWN/i.test(it.newName) || !!it.warning || !!it.renameError || !!(it.parsed && it.parsed.conflict)
+        || (!it.nameEdited && needsDims(it.parsed))
+        || (!it.nameEdited && !!(it.parsed && (it.parsed.gradeAssumed || it.parsed.heatNote))));
+}
+
+// Se marca solo si el nombre está completo: sin UNKNOWN y con medidas (si ese tipo las lleva)
+function autoInclude(it) {
+    return !/UNKNOWN/i.test(it.newName) && !needsDims(it.parsed) && !(it.parsed && it.parsed.heatNote);
+}
+
+/* ============================== ENTORNO ============================== */
+function checkEnvironment() {
+    const errors = [];
+    const warnings = [];
+    if (!('showDirectoryPicker' in window)) {
+        errors.push('Este navegador no permite abrir carpetas. Usa <b>Google Chrome</b> o <b>Microsoft Edge</b> en una computadora (no funciona en celular, Firefox ni Safari).');
+    } else if (window.top !== window.self) {
+        errors.push('La página está abierta dentro de una vista previa. Descarga el archivo y ábrelo directamente con Chrome o Edge.');
+    }
+    if (!libs.pdf) errors.push('No se pudo cargar el lector de PDF. Revisa tu conexión a internet y recarga la página.');
+    if (!libs.ocr) warnings.push('No se pudo cargar el OCR: solo se leerán PDFs que tengan texto (los escaneos quedarán como UNKNOWN).');
+
+    el.envErrors.innerHTML = errors.map(e => `<p>✗ ${e}</p>`).join('');
+    el.envErrors.classList.toggle('hidden', !errors.length);
+    el.envWarnings.innerHTML = warnings.map(w => `<p>⚠ ${w}</p>`).join('');
+    el.envWarnings.classList.toggle('hidden', !warnings.length);
+    el.folderZone.disabled = errors.length > 0;
+}
+
+/* ============================== UI GENERAL ============================== */
+function toast(kind, msg, ms = 6000) {
+    const colors = {
+        success: 'border-green-500/60 bg-green-950/95 text-green-100',
+        error: 'border-red-500/60 bg-red-950/95 text-red-100',
+        info: 'border-blue-500/60 bg-gray-900/95 text-gray-100',
+    };
+    const t = document.createElement('div');
+    t.className = `pointer-events-auto border rounded-xl px-4 py-3 shadow-2xl text-sm max-w-sm whitespace-pre-line ${colors[kind] || colors.info}`;
+    t.setAttribute('role', 'status');
+    t.textContent = msg;
+    el.toasts.appendChild(t);
+    setTimeout(() => t.remove(), ms);
+}
+
+function showProgress(title, file, frac) {
+    el.progress.classList.remove('hidden');
+    el.progressTitle.textContent = title;
+    el.progressFile.textContent = file || '';
+    el.progressBar.style.width = Math.round(Math.max(0, Math.min(1, frac || 0)) * 100) + '%';
+}
+function setProgressSub(text) { el.progressSub.textContent = text || ''; }
+function hideProgress() { el.progress.classList.add('hidden'); setProgressSub(''); }
+
+function describeProgress(m) {
+    if (!m) return '';
+    if (m.status === 'native') return 'Leyendo el texto del PDF…';
+    if (m.status === 'loading') return 'Preparando OCR (la primera vez descarga el idioma y tarda un poco)…';
+    if (m.status === 'rotate') return `La lectura salió mala: probando la página girada ${m.rot}°…`;
+    if (m.status === 'ocr') return `OCR${m.rot ? ` (girada ${m.rot}°)` : ''}: ${Math.round((m.progress || 0) * 100)}%`;
+    if (m.status === 'ocr2') return `Leyendo otra vez para encontrar las medidas: ${Math.round((m.progress || 0) * 100)}%`;
+    if (m.status === 'stamp') return `Buscando el sello de Steel & Pipe${m.rot ? ` (hoja girada ${m.rot}°)` : ''}: ${Math.round((m.progress || 0) * 100)}%`;
+    return '';
+}
+
+function setBusy(busy, applying = false) {
+    state.busy = busy;
+    state.applying = busy && applying;
+    el.folderZone.disabled = busy || !el.envErrors.classList.contains('hidden');
+    el.rescanBtn.disabled = busy || !state.dir;
+    el.filter.disabled = state.applying;
+    document.querySelectorAll('[data-lock]').forEach(b => { b.disabled = busy; });
+    document.querySelectorAll('[data-lock-apply]').forEach(b => { b.disabled = state.applying; });
+    el.cancelBtn.classList.toggle('hidden', !busy || applying);
+    if (busy) { el.cancelBtn.disabled = false; el.cancelBtn.textContent = 'Detener'; }
+    scheduleRefresh();
+}
+
+/* ============================== TARJETAS ============================== */
+const STATUS_BADGE = {
+    pending:    ['Pendiente', 'bg-gray-700 text-gray-300'],
+    processing: ['Analizando…', 'bg-blue-600/30 text-blue-300'],
+    ready:      ['Listo', 'bg-green-600/20 text-green-300'],
+    review:     ['Revisar', 'bg-orange-500/20 text-orange-300'],
+    error:      ['Error', 'bg-red-600/30 text-red-300'],
+    done:       ['Renombrado ✓', 'bg-green-600/30 text-green-200'],
+    skipped:    ['No analizado', 'bg-gray-700 text-gray-300'],
+};
+const CARD_BASE = 'relative border rounded-xl p-4 shadow-md transition-colors ';
+const BTN = 'bg-gray-700 hover:bg-gray-600 text-white px-3 py-2 rounded-lg text-xs font-medium transition-colors whitespace-nowrap disabled:opacity-40 disabled:cursor-not-allowed';
+const BTN_PURPLE = 'bg-purple-600 hover:bg-purple-500 text-white px-3 py-2 rounded-lg text-xs font-semibold transition-colors whitespace-nowrap disabled:opacity-40 disabled:cursor-not-allowed';
+
+function badgeKey(it) { return it.status === 'ready' && needsReview(it) ? 'review' : it.status; }
+
+function cardTone(it) {
+    if (it.status === 'error') return 'border-red-500/50 bg-red-950/20';
+    if (it.status === 'done') return 'border-green-600/40 bg-green-950/20';
+    if (it.status === 'processing') return 'border-blue-500/50 bg-gray-800';
+    if (needsReview(it)) return 'border-orange-500/50 bg-orange-900/10';
+    return 'border-gray-700 bg-gray-800';
+}
+
+function chip(label, value, warn, tone) {
+    const cls = warn ? 'bg-orange-500/20 text-orange-300' : (tone || 'bg-gray-900 text-gray-300');
+    return `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold ${cls}"><span class="text-gray-500 font-normal">${esc(label)}</span>${esc(value)}</span>`;
+}
+
+function typeChip(p) {
+    if (!p) return chip('Tipo', '—', true);
+    switch (p.tipoSource) {
+        case 'regla tuya': return chip('Tipo', `${p.tipo} · regla tuya`, false, 'bg-purple-600/20 text-purple-200');
+        case 'aprendido': return chip('Tipo', `${p.tipo} · aprendido ${Math.round(((p.ml && p.ml.conf) || 0) * 100)}%`, p.conflict, 'bg-purple-600/20 text-purple-200');
+        case 'asumido': return chip('Tipo', `${p.tipo} (asumido)`, true);
+        default: return chip('Tipo', p.tipo, p.conflict);
+    }
+}
+
+function typeNote(p) {
+    if (!p || !p.conflict || !p.ml) return '';
+    const why = p.ml.why && p.ml.why.length ? ` (por: ${p.ml.why.join(', ')})` : '';
+    return p.tipoSource === 'aprendido'
+        ? `Las reglas decían ${p.ruleTipo}, pero lo aprendido dice ${p.tipo}${why}. Revisa cuál es.`
+        : `Las reglas dicen ${p.tipo}, pero lo aprendido sugiere ${p.ml.tipo}${why}. Revisa cuál es.`;
+}
+
+function cardHtml(it) {
+    const [bLabel, bClass] = STATUS_BADGE[badgeKey(it)];
+    const lock = state.busy ? 'disabled' : '';
+    const lockApply = state.applying ? 'disabled' : '';
+    let body = '';
+
+    switch (it.status) {
+        case 'pending':
+            body = `<p class="text-xs text-gray-500">En cola…</p>`;
+            break;
+        case 'processing':
+            body = `<p class="text-xs text-blue-300 flex items-center gap-2"><span class="inline-block w-3.5 h-3.5 border-2 border-blue-400 border-t-transparent rounded-full animate-spin"></span><span data-role="progress">Leyendo PDF…</span></p>`;
+            break;
+        case 'skipped':
+            body = `<div class="flex flex-wrap items-center gap-3"><p class="text-xs text-gray-400">Se detuvo el proceso antes de llegar a este archivo.</p><button type="button" data-action="retry" data-lock ${lock} class="${BTN}">Analizar</button></div>`;
+            break;
+        case 'error':
+            body = `<p class="text-sm text-red-300 break-words">${esc(it.error)}</p>
+                <div class="mt-3 flex flex-wrap gap-2">
+                    <button type="button" data-action="retry" data-lock ${lock} class="${BTN}">↻ Reintentar</button>
+                    ${libs.ocr ? `<button type="button" data-action="ocr" data-lock ${lock} class="${BTN}">Reintentar con OCR</button>` : ''}
+                </div>`;
+            break;
+        case 'done':
+            body = `<p class="text-sm text-green-300 font-mono break-all">${esc(it.name)}</p>`;
+            break;
+        default: { // ready
+            const p = it.parsed || { tipo: 'Plate', tipoSource: 'asumido', heat: UNKNOWN, po: UNKNOWN };
+            const fromStamp = f => !!(p.stamp && p.stamp[f] && p.stamp[f] === p[f]);
+            const STAMP_TONE = 'bg-sky-600/20 text-sky-200';
+            const chips = [
+                typeChip(p),
+                chip(fromStamp('heat') ? 'Heat (sello)' : 'Heat', p.heat, p.heat === UNKNOWN, fromStamp('heat') ? STAMP_TONE : ''),
+                chip(fromStamp('po') ? 'PO (sello)' : 'PO', p.po, p.po === UNKNOWN, fromStamp('po') ? STAMP_TONE : ''),
+                DIM_TYPES.has(p.tipo) ? chip('Medidas', p.dims || 'no encontradas', !p.dims) : '',
+                p.stamp && p.stamp.shipment ? chip('Shipment', p.stamp.shipment, false) : '',
+            ].join('');
+            const note = typeNote(p);
+            const stampNote = !p.stamp && it.texts && it.texts.stampSearched
+                ? 'Sin sello de Steel & Pipe: el Heat y el PO salen del MTR. Revisa que el PO sea el de Premier.' : '';
+            body = `
+                <div class="flex flex-wrap gap-1.5 mb-3">${chips}</div>
+                <div class="flex flex-col sm:flex-row gap-3 sm:items-end">
+                    <div class="w-full flex-1 min-w-0">
+                        <label for="name-${it.id}" class="block text-[10px] uppercase tracking-wider font-bold text-blue-400 mb-1">Nombre final (editable)</label>
+                        <input id="name-${it.id}" data-role="name" data-lock-apply ${lockApply} type="text" spellcheck="false" autocomplete="off" value="${esc(it.newName)}" class="w-full bg-gray-950 border border-gray-600 rounded-lg px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-green-500 font-mono disabled:opacity-60">
+                    </div>
+                    <div class="flex gap-2 shrink-0">
+                        <button type="button" data-action="debug" class="${BTN}">🔍 Ver texto</button>
+                        ${libs.ocr ? `<button type="button" data-action="ocr" data-lock ${lock} class="${BTN}" title="Vuelve a leer la página 1 con OCR y prioriza lo que encuentre">🔁 Leer con OCR</button>` : ''}
+                    </div>
+                </div>
+                <p data-role="hint" class="hidden"></p>
+                ${note ? `<p class="text-xs text-purple-200 mt-2">ℹ ${esc(note)}</p>` : ''}
+                ${stampNote ? `<p class="text-xs text-gray-400 mt-2">ℹ ${esc(stampNote)}</p>` : ''}
+                ${p.poNote ? `<p class="text-xs text-amber-300 mt-2">⚠ ${esc(p.poNote)}</p>` : ''}
+                ${p.heatNote ? `<p class="text-xs text-amber-300 mt-2">⚠ ${esc(p.heatNote)}</p>` : ''}
+                ${p.gradeAssumed ? `<p class="text-xs text-amber-300 mt-2">⚠ No encontré el grado en el MTR; puse A36. Cámbialo si es otro.</p>` : ''}
+                ${it.warning ? `<p class="text-xs text-amber-300 mt-2">⚠ ${esc(it.warning)}</p>` : ''}
+                ${it.renameError ? `<p class="text-xs text-red-300 mt-2">✗ No se pudo renombrar: ${esc(it.renameError)}</p>` : ''}`;
+        }
+    }
+
+    const original = it.status === 'done' ? it.oldName : it.name;
+    const checkbox = it.status === 'ready'
+        ? `<input type="checkbox" data-action="toggle" data-lock-apply ${lockApply} ${it.include ? 'checked' : ''} class="mt-0.5 w-4 h-4 accent-green-500 cursor-pointer shrink-0" title="Incluir en el renombrado">`
+        : `<span class="w-4 shrink-0"></span>`;
+
+    return `
+        <div class="flex items-start gap-3 pr-8">
+            ${checkbox}
+            <div class="flex-1 min-w-0">
+                <div class="flex flex-wrap items-center gap-2 mb-2">
+                    <span data-role="badge" class="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide ${bClass}">${bLabel}</span>
+                    ${it.source ? `<span class="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-gray-900 text-gray-400">${esc(it.source)}</span>` : ''}
+                    <span class="text-[11px] text-gray-400 font-mono break-all"><span class="text-gray-500">${it.status === 'done' ? 'Antes:' : 'Original:'}</span> ${esc(original)}</span>
+                </div>
+                ${body}
+            </div>
+        </div>
+        <button type="button" data-action="remove" data-lock-apply ${lockApply} class="absolute top-3 right-3 text-gray-500 hover:text-red-400 p-1 bg-gray-900 rounded-full disabled:opacity-40" title="Quitar de la lista (NO borra el archivo)" aria-label="Quitar de la lista">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+        </button>`;
+}
+
+function matchesFilter(it) {
+    switch (state.filter) {
+        case 'review': return needsReview(it);
+        case 'errors': return it.status === 'error';
+        case 'ok': return it.status === 'ready' && !needsReview(it);
+        case 'done': return it.status === 'done';
+        default: return true;
+    }
+}
+
+function renderItem(it) {
+    if (it.removed) return;
+    let card = document.getElementById('card-' + it.id);
+    if (!card) {
+        card = document.createElement('div');
+        card.id = 'card-' + it.id;
+        card.dataset.id = it.id;
+        el.list.appendChild(card);
+    }
+    card.className = CARD_BASE + cardTone(it);
+    card.innerHTML = cardHtml(it);
+    card.hidden = !matchesFilter(it);
+    updateHint(it);
+}
+
+function hintInfo(it) {
+    if (it.status !== 'ready') return null;
+    if (!it.include) {
+        if (/UNKNOWN/i.test(it.newName)) return { text: 'No se renombrará: faltan datos (UNKNOWN). Corrige el nombre o marca la casilla.', tone: 'text-gray-400' };
+        if (!it.nameEdited && needsDims(it.parsed)) {
+            return { text: `No se renombrará: no encontré las medidas. Escríbelas en el nombre, después de "${it.parsed.tipo}" (ej. ${DIM_EXAMPLE[it.parsed.tipo] || '4x4x0.25'}), o marca la casilla para dejarlo sin medidas.`, tone: 'text-gray-400' };
+        }
+        return { text: 'No se renombrará (casilla desmarcada).', tone: 'text-gray-500' };
+    }
+    const p = state.plan.get(it.id);
+    if (!p) return null;
+    if (p.invalid) return { text: 'Nombre vacío o inválido.', tone: 'text-red-300' };
+    if (p.same) return { text: 'Ya tiene este nombre: no hay nada que cambiar.', tone: 'text-gray-500' };
+    if (p.renamed) return { text: `Ese nombre ya existe → se guardará como "${p.target}".`, tone: 'text-amber-300' };
+    if (/UNKNOWN/i.test(p.target)) return { text: 'Ojo: el nombre todavía contiene UNKNOWN.', tone: 'text-amber-300' };
+    if (p.target !== it.newName.trim()) return { text: `Se guardará como "${p.target}".`, tone: 'text-sky-300' };
+    return null;
+}
+
+function updateHint(it) {
+    const card = document.getElementById('card-' + it.id);
+    const hint = card && card.querySelector('[data-role="hint"]');
+    if (!hint) return;
+    const h = hintInfo(it);
+    hint.className = h ? `text-xs mt-2 break-all ${h.tone}` : 'hidden';
+    hint.textContent = h ? h.text : '';
+}
+
+function updateCardChrome(it) {
+    const card = document.getElementById('card-' + it.id);
+    if (!card) return;
+    card.className = CARD_BASE + cardTone(it);
+    card.hidden = !matchesFilter(it);
+    const badge = card.querySelector('[data-role="badge"]');
+    if (badge) {
+        const [label, cls] = STATUS_BADGE[badgeKey(it)];
+        badge.className = `px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide ${cls}`;
+        badge.textContent = label;
+    }
+}
+
+function setCardProgress(it, m) {
+    const card = document.getElementById('card-' + it.id);
+    const span = card && card.querySelector('[data-role="progress"]');
+    const text = describeProgress(m);
+    if (span && text) span.textContent = text;
+}
+
+let refreshQueued = false;
+function scheduleRefresh() {
+    if (refreshQueued) return;
+    refreshQueued = true;
+    requestAnimationFrame(() => { refreshQueued = false; refreshSummary(); });
+}
+
+function refreshSummary() {
+    state.plan = planRenames(state.items, state.existing);
+    let ready = 0, review = 0, errors = 0, done = 0, queued = 0, applyCount = 0;
+    for (const it of state.items) {
+        if (it.status === 'ready') { if (needsReview(it)) review++; else ready++; }
+        else if (it.status === 'error') errors++;
+        else if (it.status === 'done') done++;
+        else if (it.status === 'pending' || it.status === 'processing') queued++;
+        const p = state.plan.get(it.id);
+        if (p && !p.invalid && !p.same) applyCount++;
+        updateCardChrome(it);
+        updateHint(it);
+    }
+    el.fileCount.textContent = state.items.length;
+    el.applyCount.textContent = applyCount;
+    el.applyBtn.disabled = state.busy || applyCount === 0;
+    el.stats.innerHTML = [
+        ['Listos', ready, 'text-green-300'],
+        ['Por revisar', review, 'text-orange-300'],
+        ['Errores', errors, 'text-red-300'],
+        ['Renombrados', done, 'text-emerald-300'],
+        queued ? ['En cola', queued, 'text-blue-300'] : null,
+    ].filter(Boolean).map(([label, n, cls]) =>
+        `<span class="bg-gray-800 border border-gray-700 rounded-lg px-3 py-1"><b class="${cls}">${n}</b> <span class="text-gray-400">${label}</span></span>`
+    ).join('');
+}
+
+/* ============================== APRENDIZAJE ============================== */
+async function queryPerm(handle) {
+    try {
+        if (typeof handle.queryPermission !== 'function') return 'granted';
+        return await handle.queryPermission({ mode: 'readwrite' });
+    } catch (_) { return 'prompt'; }
+}
+
+async function isSameOrInside(parent, child) {
+    try {
+        if (!parent || !child) return false;
+        if (typeof parent.isSameEntry === 'function' && await parent.isSameEntry(child)) return true;
+        if (typeof parent.resolve === 'function' && (await parent.resolve(child)) !== null) return true;
+    } catch (_) { /* nada */ }
+    return false;
+}
+
+async function readMemory(dir) {
+    const text = await readTextFile(dir, MEMORY_FILE);
+    if (text == null) return { version: 1, examples: [] };
+    try {
+        const data = JSON.parse(text);
+        const examples = Array.isArray(data && data.examples) ? data.examples.filter(e => e && e.tipo && Array.isArray(e.tokens)) : [];
+        return { version: 1, examples };
+    } catch (err) {
+        // No se pisa un archivo dañado: se guarda una copia antes de empezar de cero
+        try { await writeTextFile(dir, '_memoria-mtr.dañada.json', text); } catch (_) { /* nada */ }
+        toast('error', 'El archivo de memoria estaba dañado; se guardó una copia (_memoria-mtr.dañada.json) y se empezó de cero.', 10000);
+        return { version: 1, examples: [] };
+    }
+}
+
+async function writeMemory(dir, memory) {
+    await writeTextFile(dir, MEMORY_FILE, JSON.stringify({ version: 1, updated: new Date().toISOString(), examples: memory.examples }));
+}
+
+async function ensureRulesFile(dir) {
+    const text = await readTextFile(dir, RULES_FILE);
+    if (text != null) return text;
+    try { await writeTextFile(dir, RULES_FILE, RULES_TEMPLATE); } catch (err) { console.warn('No se pudo crear reglas-tipo.txt', err); }
+    return RULES_TEMPLATE;
+}
+
+const isPdfName = n => /\.pdf$/i.test(n) && !n.startsWith('._') && !n.startsWith('~mtr-tmp-');
+
+async function listTrainingPdfs(dir) {
+    const out = [];
+    for await (const [name, h] of dir.entries()) {
+        if (h.kind === 'file') {
+            if (isPdfName(name) && !isVirginName(name)) out.push({ path: name, handle: h, folder: null });
+        } else if (h.kind === 'directory' && !/^[._]/.test(name)) {
+            for await (const [n2, h2] of h.entries()) {
+                // los PDFs sin nombre (Premier North Lot_…) no enseñan nada: se saltan
+                if (h2.kind === 'file' && isPdfName(n2) && !isVirginName(n2)) out.push({ path: `${name}/${n2}`, handle: h2, folder: name });
+            }
+        }
+    }
+    return out.sort((a, b) => a.path.localeCompare(b.path, undefined, { numeric: true, sensitivity: 'base' }));
+}
+
+// Palabras clave por carpeta: "Channel/palabras-clave.txt" con una palabra o frase por renglón (o separadas por comas).
+// Se convierten en reglas "Channel: …" que se suman a reglas-tipo.txt.
+const KEYWORD_FILES = ['palabras-clave.txt', 'palabras clave.txt', 'keywords.txt'];
+async function readFolderKeywords(dir) {
+    const lines = [];
+    for await (const [name, h] of dir.entries()) {
+        if (h.kind !== 'directory' || /^[._]/.test(name)) continue;
+        const tipo = tidyType(name);
+        if (!KNOWN_TYPES.includes(tipo)) continue;
+        for (const f of KEYWORD_FILES) {
+            const text = await readTextFile(h, f);
+            if (text == null) continue;
+            const kws = text.split(/\r?\n/).filter(l => l.trim() && !l.trim().startsWith('#')).join(',').split(',').map(k => k.trim()).filter(Boolean);
+            if (kws.length) lines.push(`${tipo}: ${kws.join(', ')}`);
+            break;
+        }
+    }
+    return lines.length ? '\n# --- de los palabras-clave.txt de cada carpeta ---\n' + lines.join('\n') + '\n' : '';
+}
+
+async function loadRules(dir) {
+    const root = await ensureRulesFile(dir);
+    let folders = '';
+    try { folders = await readFolderKeywords(dir); } catch (err) { console.warn('No se pudieron leer las palabras clave de las carpetas', err); }
+    return root + folders;
+}
+
+function rebuildKnowledge() {
+    state.kb = buildKnowledge(state.memory ? state.memory.examples : [], state.rulesText || '');
+}
+
+// Lee los ejemplos de la carpeta de entrenamiento. Solo procesa los nuevos o cambiados (el resto sale de la memoria).
+async function syncTraining() {
+    const dir = state.trainDir;
+    if (!dir || state.trainPerm !== 'granted') return null;
+    const memory = await readMemory(dir);
+    state.rulesText = await loadRules(dir);
+    const files = await listTrainingPdfs(dir);
+    const cached = new Map(memory.examples.filter(e => e.origin === 'carpeta').map(e => [e.key, e]));
+    const keep = [];
+    const skipped = [];
+    let changed = false;
+    let fresh = 0;
+    let cancelled = false;
+
+    for (let i = 0; i < files.length; i++) {
+        if (state.cancel) { cancelled = true; break; }
+        const f = files[i];
+        const label = labelFromFileName(f.handle.name, f.folder);
+        if (!label) { skipped.push(`${f.path} (no se entiende el tipo en el nombre)`); continue; }
+        let file;
+        try { file = await f.handle.getFile(); } catch (err) { skipped.push(`${f.path} (${friendlyError(err)})`); continue; }
+        const key = `${f.path}|${file.size}|${file.lastModified}`;
+        const old = cached.get(key);
+        if (old) { keep.push(old); continue; }
+
+        showProgress(`Aprendiendo de ejemplos: ${i + 1} de ${files.length}`, f.path, i / files.length);
+        setProgressSub('');
+        try {
+            const res = await analyzePdf(file, { onProgress: m => setProgressSub(describeProgress(m)), stampSearch: false });
+            keep.push(makeExample(featureTextOf(res.texts), label, { key, origin: 'carpeta', file: f.path }));
+            changed = true;
+            fresh++;
+        } catch (err) {
+            skipped.push(`${f.path} (${friendlyError(err)})`);
+        }
+    }
+
+    const keptKeys = new Set(keep.map(e => e.key));
+    if (cancelled) {
+        for (const e of cached.values()) if (!keptKeys.has(e.key)) keep.push(e);   // no se olvida nada por detener
+    } else if ([...cached.keys()].some(k => !keptKeys.has(k))) {
+        changed = true;                                                              // se borraron ejemplos de la carpeta
+    }
+    memory.examples = [...keep, ...memory.examples.filter(e => e.origin !== 'carpeta')];
+    if (changed) await writeMemory(dir, memory);
+    state.memory = memory;
+    rebuildKnowledge();
+    state.trainInfo = { skipped, files: files.length, fresh, at: Date.now() };
+    return state.trainInfo;
+}
+
+// Vuelve a interpretar las tarjetas con lo aprendido (sin volver a leer los PDFs)
+function reinterpretAll() {
+    for (const it of state.items) {
+        if (it.status !== 'ready' || !it.texts || it.nameEdited) continue;
+        it.parsed = interpretTexts(it.texts, state.kb);
+        it.newName = generateFileName(it.parsed);
+        if (!it.userToggled) it.include = autoInclude(it);
+        renderItem(it);
+    }
+    scheduleRefresh();
+}
+
+async function learnFromApplied(items) {
+    if (!state.trainDir) return 0;
+    if ((await queryPerm(state.trainDir)) !== 'granted') return -1;
+    const memory = await readMemory(state.trainDir);
+    let added = 0;
+    for (const it of items) {
+        const label = labelFromFileName(it.name, null);
+        if (!label || !it.texts) continue;
+        const ft = featureTextOf(it.texts);
+        if (!ft.trim()) continue;
+        const key = label.heat && label.po ? `confirmado|${label.tipo}|${label.heat}|${label.po}` : `confirmado|${it.name}|${Date.now()}`;
+        const ex = makeExample(ft, label, { key, origin: 'confirmado', file: it.name });
+        memory.examples = memory.examples.filter(e => e.key !== ex.key);
+        memory.examples.push(ex);
+        added++;
+    }
+    const confirmed = memory.examples.filter(e => e.origin === 'confirmado');
+    if (confirmed.length > CONFIG.MAX_CONFIRMED) {
+        const drop = new Set(confirmed.slice(0, confirmed.length - CONFIG.MAX_CONFIRMED).map(e => e.key));
+        memory.examples = memory.examples.filter(e => !drop.has(e.key));
+    }
+    if (added) await writeMemory(state.trainDir, memory);
+    state.memory = memory;
+    rebuildKnowledge();
+    return added;
+}
+
+function renderLearnPanel() {
+    const kb = state.kb;
+    const actions = [];
+    let status = '';
+    let sub = '';
+    if (!state.trainDir) {
+        status = 'Todavía no hay carpeta de entrenamiento.';
+        sub = 'Elige una carpeta con PDFs de ejemplo bien nombrados y la herramienta aprende de ellos (abre "¿Cómo se usa?").';
+        actions.push(['choose', 'Elegir carpeta de entrenamiento', true]);
+    } else if (state.trainPerm !== 'granted') {
+        status = `Carpeta de entrenamiento: ${state.trainDir.name}`;
+        sub = 'El navegador necesita tu permiso otra vez para usarla.';
+        actions.push(['connect', 'Conectar', true], ['choose', 'Cambiar carpeta', false]);
+    } else {
+        const s = kb ? kb.stats : { examples: 0, perClass: {} };
+        const per = Object.entries(s.perClass).sort((a, b) => b[1] - a[1]).map(([c, n]) => `${c} ${n}`).join(' · ');
+        status = `Carpeta: ${state.trainDir.name} · ${s.examples} ejemplo(s)${per ? ': ' + per : ''}`;
+        const bits = [];
+        if (kb && kb.rules.length) bits.push(`${kb.rules.length} palabra(s) clave tuyas`);
+        const nl = kb ? kb.labels.heat.length + kb.labels.po.length : 0;
+        if (nl) bits.push(`${nl} etiqueta(s) de Heat/PO aprendidas`);
+        if (!kb || !kb.model) bits.push('para distinguir tipos necesito ejemplos de al menos 2 tipos');
+        if (state.trainInfo && state.trainInfo.skipped.length) bits.push(`${state.trainInfo.skipped.length} archivo(s) no se entendieron (ver lo aprendido)`);
+        sub = bits.join(' · ');
+        actions.push(['sync', '↻ Re-aprender', false], ['view', 'Ver lo aprendido', false], ['choose', 'Cambiar carpeta', false]);
+        const nConf = state.memory ? state.memory.examples.filter(e => e.origin === 'confirmado').length : 0;
+        if (nConf) actions.push(['forget', `Olvidar mis aprobados (${nConf})`, false]);
+    }
+    el.learnStatus.textContent = status;
+    el.learnSub.textContent = sub;
+    el.learnActions.innerHTML = actions.map(([a, label, primary]) =>
+        `<button type="button" data-learn="${a}" data-lock ${state.busy ? 'disabled' : ''} class="${primary ? BTN_PURPLE : BTN}">${esc(label)}</button>`
+    ).join('');
+}
+
+async function initTraining() {
+    const h = await kv.get('trainDir');
+    if (h) {
+        state.trainDir = h;
+        state.trainPerm = await queryPerm(h);
+        if (state.trainPerm === 'granted') {
+            try {
+                state.memory = await readMemory(h);
+                state.rulesText = await loadRules(h);
+                rebuildKnowledge();
+            } catch (err) { console.warn(err); }
+        }
+    }
+    renderLearnPanel();
+}
+
+async function runTrainingSync() {
+    if (state.busy || !state.trainDir) return;
+    setBusy(true);
+    state.cancel = false;
+    showProgress('Aprendiendo de ejemplos…', state.trainDir.name, 0);
+    try {
+        const info = await syncTraining();
+        reinterpretAll();
+        if (info) {
+            const s = state.kb.stats;
+            toast('success', `Aprendizaje listo: ${s.examples} ejemplo(s)${info.fresh ? `, ${info.fresh} nuevo(s)` : ''}.` +
+                (info.skipped.length ? `\n${info.skipped.length} archivo(s) no se entendieron: revisa "Ver lo aprendido".` : ''), 8000);
+        }
+    } catch (err) {
+        console.error(err);
+        toast('error', 'No se pudo aprender de la carpeta: ' + friendlyError(err));
+    } finally {
+        hideProgress();
+        setBusy(false);
+        scheduleOcrShutdown();
+        renderLearnPanel();
+    }
+}
+
+async function chooseTrainingFolder() {
+    if (state.busy) return;
+    let dir;
+    try {
+        dir = await window.showDirectoryPicker({ id: 'mtr-training', mode: 'readwrite' });
+    } catch (err) {
+        if (err && err.name === 'AbortError') return;
+        toast('error', 'No se pudo abrir la carpeta: ' + friendlyError(err));
+        return;
+    }
+    if (state.dir && (await isSameOrInside(dir, state.dir) || await isSameOrInside(state.dir, dir))) {
+        toast('error', 'La carpeta de entrenamiento tiene que estar aparte de la carpeta de MTR que vas a renombrar.', 9000);
+        return;
+    }
+    state.trainDir = dir;
+    state.trainPerm = 'granted';
+    state.trainInfo = null;
+    await kv.set('trainDir', dir);
+    await runTrainingSync();
+}
+
+async function connectTraining() {
+    if (state.busy || !state.trainDir) return;
+    try { state.trainPerm = await state.trainDir.requestPermission({ mode: 'readwrite' }); }
+    catch (err) { toast('error', 'No se pudo pedir permiso: ' + friendlyError(err)); }
+    renderLearnPanel();
+    if (state.trainPerm === 'granted') await runTrainingSync();
+}
+
+async function forgetConfirmed() {
+    if (state.busy || !state.trainDir || !state.memory) return;
+    const n = state.memory.examples.filter(e => e.origin === 'confirmado').length;
+    if (!confirm(`¿Olvidar lo aprendido de ${n} nombre(s) que aprobaste? Los PDFs de la carpeta de entrenamiento no se tocan.`)) return;
+    setBusy(true);
+    try {
+        const memory = await readMemory(state.trainDir);
+        memory.examples = memory.examples.filter(e => e.origin !== 'confirmado');
+        await writeMemory(state.trainDir, memory);
+        state.memory = memory;
+        rebuildKnowledge();
+        reinterpretAll();
+        toast('info', 'Listo, se olvidaron.');
+    } catch (err) {
+        toast('error', 'No se pudo guardar: ' + friendlyError(err));
+    } finally {
+        setBusy(false);
+        renderLearnPanel();
+    }
+}
+
+function openLearnModal() {
+    const kb = state.kb;
+    const parts = [];
+    const h4 = t => `<h4 class="font-semibold text-gray-100 mb-1">${t}</h4>`;
+    if (!kb || !kb.stats.examples) {
+        parts.push('<p>Todavía no hay ejemplos. Copia PDFs bien nombrados a la carpeta de entrenamiento y toca "Re-aprender".</p>');
+    } else if (kb.model) {
+        parts.push(`<div>${h4('Tipos que sabe distinguir')}<div class="space-y-2">` + kb.model.classes.map(c =>
+            `<div class="bg-gray-800 rounded-lg p-3"><b class="text-purple-200">${esc(c)}</b> <span class="text-gray-500">(${kb.stats.perClass[c]} ejemplo(s))</span>
+             <div class="text-xs text-gray-400 mt-1">Lo reconoce por: ${topIndicators(kb.model, c, 14).map(esc).join(', ') || '—'}</div></div>`
+        ).join('') + '</div></div>');
+    } else {
+        parts.push(`<p class="text-amber-300">Para distinguir tipos necesito ejemplos de al menos 2 tipos distintos. Ahora hay: ${esc(Object.keys(kb.stats.perClass).join(', ') || 'ninguno')}.</p>`);
+    }
+    if (kb) {
+        const lab = arr => arr.length ? arr.map(x => `${esc(x.label)} (${x.count})`).join(', ') : '—';
+        parts.push(`<div>${h4('Etiquetas aprendidas de tus molinos')}<p class="text-xs text-gray-400">Heat: ${lab(kb.labels.heat)}<br>PO: ${lab(kb.labels.po)}</p></div>`);
+        parts.push(`<div>${h4('Tus reglas (reglas-tipo.txt)')}<p class="text-xs text-gray-400">${kb.rules.length
+            ? kb.rules.map(r => `${esc(r.tipo)} ← ${esc(r.raw)}`).join('<br>')
+            : 'Ninguna activa. Edita reglas-tipo.txt en la carpeta de entrenamiento y toca "Re-aprender".'}</p></div>`);
+    }
+    if (state.trainInfo && state.trainInfo.skipped.length) {
+        parts.push(`<div>${h4('Archivos que no se entendieron')}<p class="text-xs text-amber-300">${state.trainInfo.skipped.map(esc).join('<br>')}</p>
+            <p class="text-xs text-gray-500 mt-1">Nómbralos como "Tipo medidas Heat X PO Y.pdf" o ponlos en una subcarpeta con el nombre del tipo.</p></div>`);
+    }
+    parts.push('<p class="text-xs text-gray-500">Consejo: si confunde dos tipos, agrega más ejemplos de esos dos tipos, del mismo molino. Si hay una palabra que siempre los distingue, ponla en reglas-tipo.txt.</p>');
+    el.learnContent.innerHTML = parts.join('');
+    openModal(el.learnModal);
+}
+
+/* ============================== FLUJO PRINCIPAL ============================== */
+async function pickFolder() {
+    if (state.busy) return;
+    let dir;
+    try {
+        dir = await window.showDirectoryPicker({ id: 'mtr-renamer', mode: 'readwrite' });
+    } catch (err) {
+        if (err && err.name === 'AbortError') return;
+        toast('error', 'No se pudo abrir la carpeta: ' + friendlyError(err));
+        return;
+    }
+    if (state.trainDir && (await isSameOrInside(state.trainDir, dir) || await isSameOrInside(dir, state.trainDir))) {
+        toast('error', 'Esa es (o contiene) la carpeta de entrenamiento. Elige la carpeta de MTR que quieres renombrar.', 9000);
+        return;
+    }
+    state.dir = dir;
+    state.savedDir = dir;
+    el.folderTitle.textContent = 'Cambiar de carpeta';
+    el.resumeBar.classList.add('hidden');
+    await kv.set('workDir', dir);
+    await scanFolder();
+}
+
+// Al abrir la página: si el navegador ya dio permiso para la última carpeta, se lee sola; si no, basta un clic.
+async function restoreWorkDir() {
+    if (!el.envErrors.classList.contains('hidden')) return;
+    const h = await kv.get('workDir');
+    if (!h || state.dir) return;
+    state.savedDir = h;
+    if ((await queryPerm(h)) === 'granted') {
+        state.dir = h;
+        el.folderTitle.textContent = 'Cambiar de carpeta';
+        await scanFolder();
+    } else {
+        el.resumeName.textContent = h.name;
+        el.resumeBar.classList.remove('hidden');
+    }
+}
+
+async function resumeWorkDir() {
+    const h = state.savedDir;
+    if (!h || state.busy) return;
+    let perm = 'denied';
+    try { perm = typeof h.requestPermission === 'function' ? await h.requestPermission({ mode: 'readwrite' }) : 'granted'; }
+    catch (err) { toast('error', 'No se pudo abrir la carpeta: ' + friendlyError(err)); return; }
+    if (perm !== 'granted') { toast('info', 'Sin permiso no puedo leer la carpeta. Puedes elegirla con el botón grande.'); return; }
+    el.resumeBar.classList.add('hidden');
+    state.dir = h;
+    el.folderTitle.textContent = 'Cambiar de carpeta';
+    await scanFolder();
+}
+
+// ---------- Vigilar la carpeta ----------
+// Cada pocos segundos revisa si llegaron PDFs nuevos. Un archivo se analiza cuando dejó de crecer
+// (el escáner puede estar todavía escribiéndolo).
+const WATCH_MS = 8000;
+const watch = { timer: null, running: false, seen: new Map(), lastCheck: 0 };
+
+function startWatch() {
+    clearInterval(watch.timer);
+    watch.timer = state.watchNew ? setInterval(checkNewFiles, WATCH_MS) : null;
+    renderWatchInfo();
+}
+
+function renderWatchInfo() {
+    const on = state.watchNew && state.dir;
+    el.watchInfo.textContent = on ? `Vigilando "${state.dir.name}": los escaneos nuevos se agregan solos.` : '';
+    el.watchInfo.classList.toggle('hidden', !on);
+}
+
+async function checkNewFiles() {
+    if (!state.watchNew || !state.dir || state.busy || watch.running) return;
+    watch.running = true;
+    try {
+        if ((await queryPerm(state.dir)) !== 'granted') return;
+        const known = new Set(state.items.map(i => i.name.toLowerCase()));
+        const fresh = [];
+        for await (const [name, handle] of state.dir.entries()) {
+            const low = name.toLowerCase();
+            if (handle.kind !== 'file' || !isPdfName(name)) continue;
+            if (state.onlyNew && !isVirginName(name)) continue;
+            if (known.has(low) || state.ignored.has(low)) continue;
+            let sig = '';
+            try { const f = await handle.getFile(); sig = f.size ? `${f.size}|${f.lastModified}` : ''; } catch (_) { sig = ''; }
+            const prev = watch.seen.get(low);
+            watch.seen.set(low, sig);
+            if (!sig || prev !== sig) continue;      // todavía se está escribiendo (o es nuevo): se revisa en la próxima vuelta
+            fresh.push([name, handle]);
+        }
+        if (fresh.length && !state.busy) await analyzeNew(fresh);
+    } catch (err) {
+        console.warn('Vigilar carpeta:', err);
+    } finally {
+        watch.running = false;
+    }
+}
+
+async function analyzeNew(list) {
+    list.sort((a, b) => a[0].localeCompare(b[0], undefined, { numeric: true, sensitivity: 'base' }));
+    const items = list.map(([name, handle]) => newItem(name, handle));
+    for (const [name] of list) state.existing.add(name.toLowerCase());
+    state.items.push(...items);
+    el.results.classList.remove('hidden');
+    el.emptyMsg.classList.add('hidden');
+    items.forEach(renderItem);
+    refreshSummary();
+    toast('info', `Llegaron ${items.length} escaneo(s) nuevo(s). Analizando…`, 5000);
+    setBusy(true);
+    state.cancel = false;
+    try {
+        for (let i = 0; i < items.length; i++) {
+            const it = items[i];
+            if (it.removed) continue;
+            if (state.cancel) { items.slice(i).forEach(x => { if (!x.removed && x.status === 'pending') { x.status = 'skipped'; renderItem(x); } }); break; }
+            it.status = 'processing';
+            renderItem(it);
+            showProgress(`Escaneo nuevo ${i + 1} de ${items.length}`, it.name, i / items.length);
+            setProgressSub('');
+            await analyzeItem(it, { onProgress: m => { setProgressSub(describeProgress(m)); setCardProgress(it, m); } });
+            renderItem(it);
+            scheduleRefresh();
+        }
+    } finally {
+        hideProgress();
+        setBusy(false);
+        scheduleOcrShutdown();
+    }
+}
+
+async function analyzeItem(it, opts = {}) {
+    try {
+        const file = await it.handle.getFile();
+        const res = await analyzePdf(file, { ...opts, kb: state.kb });
+        it.texts = res.texts;
+        it.warning = res.warning || '';
+        it.parsed = interpretTexts(res.texts, state.kb);
+        it.source = sourceLabel(res.texts) + (it.parsed.stamp ? ' · Sello S&P' : '');
+        it.newName = generateFileName(it.parsed);
+        it.status = 'ready';
+        it.error = '';
+        it.renameError = '';
+        it.nameEdited = false;
+        if (!it.userToggled) it.include = autoInclude(it);
+    } catch (err) {
+        console.error('Error leyendo', it.name, err);
+        it.status = 'error';
+        it.error = friendlyError(err);
+        it.include = false;
+    }
+}
+
+async function scanFolder() {
+    if (!state.dir || state.busy) return;
+    setBusy(true);
+    state.cancel = false;
+    state.items = [];
+    state.ignored = new Set();
+    watch.seen.clear();
+    state.existing = new Set();
+    state.plan = new Map();
+    el.list.innerHTML = '';
+    el.emptyMsg.classList.add('hidden');
+    el.results.classList.remove('hidden');
+    el.folderName.textContent = state.dir.name;
+    showProgress('Preparando…', '', 0);
+
+    try {
+        // 0) Aprender primero de la carpeta de entrenamiento (solo lee ejemplos nuevos)
+        if (state.trainDir) {
+            state.trainPerm = await queryPerm(state.trainDir);
+            if (state.trainPerm === 'granted') {
+                try { await syncTraining(); }
+                catch (err) { console.error(err); toast('error', 'No se pudo leer la carpeta de entrenamiento: ' + friendlyError(err)); }
+            } else {
+                toast('info', 'Toca "Conectar" en Aprendizaje para usar lo aprendido.', 8000);
+            }
+            renderLearnPanel();
+        }
+
+        // 1) Listar (no se procesa mientras se recorre la carpeta)
+        showProgress('Leyendo la carpeta…', '', 0);
+        const found = [];
+        let named = 0;
+        for await (const [name, handle] of state.dir.entries()) {
+            state.existing.add(name.toLowerCase());
+            if (handle.kind !== 'file' || !isPdfName(name)) continue;
+            if (state.onlyNew && !isVirginName(name)) { named++; continue; }   // ya tiene nombre: no se toca
+            found.push([name, handle]);
+        }
+        state.skippedNamed = named;
+        found.sort((a, b) => a[0].localeCompare(b[0], undefined, { numeric: true, sensitivity: 'base' }));
+        state.items = found.map(([name, handle]) => newItem(name, handle));
+        state.items.forEach(renderItem);
+        renderNamedInfo();
+        renderWatchInfo();
+        refreshSummary();
+
+        if (!state.items.length) {
+            el.emptyMsg.textContent = named
+                ? `No hay PDFs nuevos del escáner (Premier North Lot_…) en esta carpeta. Los ${named} PDF(s) que hay ya tienen nombre. Para revisarlos igual, desmarca "Solo los PDFs nuevos del escáner".`
+                : 'No se encontraron PDFs en esta carpeta.';
+            el.emptyMsg.classList.remove('hidden');
+            return;
+        }
+
+        // 2) Procesar uno por uno, liberando memoria después de cada PDF
+        const queue = state.items.slice();
+        for (let i = 0; i < queue.length; i++) {
+            const it = queue[i];
+            if (it.removed) continue;
+            if (state.cancel) {
+                queue.slice(i).forEach(x => { if (!x.removed && x.status === 'pending') { x.status = 'skipped'; renderItem(x); } });
+                break;
+            }
+            it.status = 'processing';
+            renderItem(it);
+            showProgress(`Analizando ${i + 1} de ${queue.length}`, it.name, i / queue.length);
+            setProgressSub('');
+            await analyzeItem(it, {
+                onProgress: m => { setProgressSub(describeProgress(m)); setCardProgress(it, m); },
+            });
+            renderItem(it);
+            scheduleRefresh();
+        }
+        if (state.cancel) toast('info', 'Proceso detenido. Los archivos que faltaron quedan como "No analizado".');
+    } catch (err) {
+        console.error(err);
+        toast('error', 'Error leyendo la carpeta: ' + friendlyError(err));
+    } finally {
+        hideProgress();
+        setBusy(false);
+        scheduleOcrShutdown();
+    }
+}
+
+function renderNamedInfo() {
+    const n = state.onlyNew ? state.skippedNamed : 0;
+    el.namedInfo.textContent = n ? `${n} PDF(s) ya tienen nombre (no empiezan con "Premier North Lot_") y no se tocan.` : '';
+    el.namedInfo.classList.toggle('hidden', !n);
+}
+
+async function reprocess(it, forceOcr) {
+    if (state.busy) return;
+    setBusy(true);
+    it.status = 'processing';
+    it.userToggled = false;
+    renderItem(it);
+    try {
+        await analyzeItem(it, { forceOcr, onProgress: m => setCardProgress(it, m) });
+    } finally {
+        setBusy(false);
+        renderItem(it);
+        scheduleRefresh();
+        scheduleOcrShutdown();
+    }
+}
+
+async function ensureWritePermission(handle) {
+    const opts = { mode: 'readwrite' };
+    if (typeof handle.queryPermission === 'function' && (await handle.queryPermission(opts)) === 'granted') return true;
+    if (typeof handle.requestPermission === 'function') return (await handle.requestPermission(opts)) === 'granted';
+    return true;
+}
+
+async function applyRenames() {
+    if (state.busy || !state.dir) return;
+
+    let granted = false;
+    try { granted = await ensureWritePermission(state.dir); }
+    catch (err) { toast('error', 'No se pudo pedir permiso: ' + friendlyError(err)); return; }
+    if (!granted) { toast('error', 'El navegador no dio permiso para modificar la carpeta.'); return; }
+
+    setBusy(true, true);
+    try {
+        const fresh = await listNamesLower(state.dir);
+        state.existing = fresh;
+        const plan = planRenames(state.items, fresh);
+        const jobs = state.items.filter(it => { const p = plan.get(it.id); return p && !p.invalid && !p.same; });
+        if (!jobs.length) { toast('info', 'No hay cambios que aplicar.'); return; }
+
+        const dupes = jobs.filter(it => plan.get(it.id).renamed).length;
+        const unknowns = jobs.filter(it => /UNKNOWN/i.test(plan.get(it.id).target)).length;
+        const conflicts = jobs.filter(it => it.parsed && it.parsed.conflict).length;
+        let msg = `Se van a renombrar ${jobs.length} archivo(s) en la carpeta "${state.dir.name}".`;
+        if (dupes) msg += `\n\n${dupes} llevarán (2), (3)… porque ese nombre ya existe.`;
+        if (unknowns) msg += `\n\nAtención: ${unknowns} todavía contienen "UNKNOWN".`;
+        if (conflicts) msg += `\n\n${conflicts} tienen el tipo en duda (reglas y aprendizaje no coinciden).`;
+        if (state.learnApplied && state.trainDir) msg += '\n\nLos nombres que apruebes se guardarán como ejemplos para aprender.';
+        msg += '\n\n¿Continuar?';
+        if (!confirm(msg)) return;
+
+        let ok = 0;
+        let failed = 0;
+        for (let i = 0; i < jobs.length; i++) {
+            const it = jobs[i];
+            const target = plan.get(it.id).target;
+            showProgress(`Renombrando ${i + 1} de ${jobs.length}`, `${it.name} → ${target}`, i / jobs.length);
+            try {
+                await safeRename(state.dir, it.handle, it.name, target);
+                it.oldName = it.name;
+                it.name = target;
+                it.newName = target;
+                try { it.handle = await state.dir.getFileHandle(target); } catch (_) { /* nada */ }
+                it.status = 'done';
+                it.renameError = '';
+                ok++;
+            } catch (err) {
+                console.error('No se pudo renombrar', it.name, err);
+                it.renameError = friendlyError(err);
+                failed++;
+            }
+            renderItem(it);
+        }
+        try { state.existing = await listNamesLower(state.dir); } catch (_) { /* nada */ }
+
+        // Aprender de lo aprobado
+        let learned = '';
+        const doneNow = jobs.filter(it => it.status === 'done');
+        if (state.learnApplied && state.trainDir && doneNow.length) {
+            showProgress('Guardando lo aprendido…', '', 1);
+            try {
+                const n = await learnFromApplied(doneNow);
+                if (n > 0) { learned = `\nAprendí de ${n} archivo(s).`; reinterpretAll(); }
+                else if (n < 0) learned = '\n(No aprendí: la carpeta de entrenamiento necesita permiso, toca "Conectar".)';
+            } catch (err) {
+                console.error(err);
+                learned = '\n(No se pudo guardar lo aprendido: ' + friendlyError(err) + ')';
+            }
+            renderLearnPanel();
+        }
+
+        if (failed) toast('error', `Renombrados: ${ok}. Fallaron: ${failed} (revisa las tarjetas marcadas; ningún original se perdió).${learned}`, 12000);
+        else toast('success', `¡Listo! Se renombraron ${ok} archivo(s) en tu computadora.${learned}`, 8000);
+    } catch (err) {
+        console.error(err);
+        toast('error', 'Error al aplicar cambios: ' + friendlyError(err));
+    } finally {
+        hideProgress();
+        setBusy(false);
+    }
+}
+
+function removeItem(it) {
+    if (state.applying) return;
+    it.removed = true;
+    state.ignored.add(it.name.toLowerCase());
+    state.items = state.items.filter(x => x !== it);
+    const card = document.getElementById('card-' + it.id);
+    if (card) card.remove();
+    scheduleRefresh();
+}
+
+/* ============================== MODALES ============================== */
+let debugItem = null;
+
+function openModal(m) { m.classList.remove('hidden'); m.classList.add('flex'); const c = m.querySelector('[data-close-modal]'); if (c) c.focus(); }
+function closeModal(m) { m.classList.add('hidden'); m.classList.remove('flex'); if (m === el.debugModal) debugItem = null; }
+
+function openDebug(it) {
+    debugItem = it;
+    const p = it.parsed || {};
+    el.debugName.textContent = it.name;
+    el.debugSource.textContent = `Procesado vía: ${it.source || '—'}`;
+    const lines = [];
+    const src = { 'regla tuya': `tu regla en reglas-tipo.txt ("${p.ruleMatched}")`, aprendido: 'lo aprendido de tus ejemplos', reglas: 'las reglas automáticas', asumido: 'nada: se asumió Plate' }[p.tipoSource] || '—';
+    lines.push(`Tipo decidido por: ${src}.`);
+    lines.push(`Reglas automáticas: ${p.ruleTipo || 'no encontraron el tipo'}.`);
+    if (p.poNote) lines.push(p.poNote);
+    if (p.heatNote) lines.push(p.heatNote);
+    if (p.gradeAssumed) lines.push('Grado: no se encontró en el MTR; se puso A36.');
+    if (DIM_TYPES.has(p.tipo)) {
+        lines.push(p.dims ? `Medidas: ${p.dims} (leídas de "${p.dimsFrom}").` : 'Medidas: no se encontraron en el texto; escríbelas en el nombre.');
+    }
+    if (p.stamp) {
+        lines.push(`Sello de Steel & Pipe: Customer PO ${p.stamp.poRaw || '?'} · Heat ${p.stamp.heat || '?'}${p.stamp.shipment ? ` · Shipment ${p.stamp.shipment}` : ''}. El Heat y el PO del nombre salen de aquí.`);
+    } else if (it.texts && it.texts.stampSearched) {
+        lines.push('Sello de Steel & Pipe: no se encontró; el Heat y el PO salen del cuerpo del MTR.');
+    }
+    if (p.ml) lines.push(`Aprendizaje: ${p.ml.tipo} ${Math.round(p.ml.conf * 100)}%${p.ml.why.length ? ` (por: ${p.ml.why.join(', ')})` : ''}${p.ml.second ? `; segunda opción: ${p.ml.second}` : ''}.`);
+    else if (state.kb && state.kb.model) lines.push('Aprendizaje: no reconoció nada parecido a tus ejemplos.');
+    el.debugFields.innerHTML = `<div class="flex flex-wrap gap-2">${[typeChip(p.tipo ? p : null), chip('Heat', p.heat || '—', p.heat === UNKNOWN), chip('PO', p.po || '—', p.po === UNKNOWN)].join('')}</div>
+        <p class="text-xs text-gray-400">${lines.map(esc).join('<br>')}</p>`;
+    el.debugContent.textContent = buildDebugText(it.texts);
+    openModal(el.debugModal);
+}
+
+/* ============================== EVENTOS ============================== */
+function itemFromNode(node) {
+    const card = node.closest('[data-id]');
+    return card ? state.items.find(x => x.id === card.dataset.id) : null;
+}
+
+el.folderZone.addEventListener('click', pickFolder);
+el.rescanBtn.addEventListener('click', scanFolder);
+el.applyBtn.addEventListener('click', applyRenames);
+el.cancelBtn.addEventListener('click', () => {
+    state.cancel = true;
+    el.cancelBtn.disabled = true;
+    el.cancelBtn.textContent = 'Deteniendo…';
+});
+el.filter.addEventListener('change', () => {
+    state.filter = el.filter.value;
+    state.items.forEach(updateCardChrome);
+});
+
+el.learnActions.addEventListener('click', e => {
+    const b = e.target.closest('button[data-learn]');
+    if (!b || b.disabled) return;
+    const fn = { choose: chooseTrainingFolder, connect: connectTraining, sync: runTrainingSync, view: openLearnModal, forget: forgetConfirmed }[b.dataset.learn];
+    if (fn) fn();
+});
+el.resumeBtn.addEventListener('click', resumeWorkDir);
+el.watchNew.addEventListener('change', () => {
+    state.watchNew = el.watchNew.checked;
+    try { localStorage.setItem('mtr-watch-new', state.watchNew ? '1' : '0'); } catch (_) { /* nada */ }
+    startWatch();
+});
+el.onlyNew.addEventListener('change', () => {
+    state.onlyNew = el.onlyNew.checked;
+    try { localStorage.setItem('mtr-only-new', state.onlyNew ? '1' : '0'); } catch (_) { /* nada */ }
+    if (state.dir && !state.busy) scanFolder();
+});
+el.learnApplied.addEventListener('change', () => {
+    state.learnApplied = el.learnApplied.checked;
+    try { localStorage.setItem('mtr-learn-applied', state.learnApplied ? '1' : '0'); } catch (_) { /* nada */ }
+});
+
+el.list.addEventListener('click', e => {
+    const btn = e.target.closest('button[data-action]');
+    if (!btn || btn.disabled) return;
+    const it = itemFromNode(btn);
+    if (!it) return;
+    switch (btn.dataset.action) {
+        case 'remove': removeItem(it); break;
+        case 'debug': openDebug(it); break;
+        case 'ocr': reprocess(it, true); break;
+        case 'retry': reprocess(it, false); break;
+    }
+});
+
+el.list.addEventListener('change', e => {
+    if (!e.target.matches('[data-action="toggle"]')) return;
+    const it = itemFromNode(e.target);
+    if (!it) return;
+    it.include = e.target.checked;
+    it.userToggled = true;
+    scheduleRefresh();
+});
+
+el.list.addEventListener('input', e => {
+    if (!e.target.matches('[data-role="name"]')) return;
+    const it = itemFromNode(e.target);
+    if (!it) return;
+    it.newName = e.target.value;
+    it.nameEdited = true;
+    if (!it.userToggled) {
+        it.include = !/UNKNOWN/i.test(it.newName) && !!sanitizeFileName(it.newName);
+        const cb = e.target.closest('[data-id]').querySelector('[data-action="toggle"]');
+        if (cb) cb.checked = it.include;
+    }
+    scheduleRefresh();
+});
+
+for (const m of [el.debugModal, el.learnModal]) {
+    m.addEventListener('click', e => { if (e.target === m || e.target.closest('[data-close-modal]')) closeModal(m); });
+}
+document.addEventListener('keydown', e => {
+    if (e.key !== 'Escape') return;
+    for (const m of [el.debugModal, el.learnModal]) if (!m.classList.contains('hidden')) closeModal(m);
+});
+el.debugCopy.addEventListener('click', async () => {
+    if (!debugItem) return;
+    try { await navigator.clipboard.writeText(buildDebugText(debugItem.texts)); toast('info', 'Texto copiado.', 2500); }
+    catch (_) { toast('error', 'No se pudo copiar; selecciona el texto manualmente.'); }
+});
+
+window.addEventListener('beforeunload', e => {
+    if (state.busy) { e.preventDefault(); e.returnValue = ''; }
+});
+
+/* ============================== INICIO ============================== */
+checkEnvironment();
+try { state.learnApplied = localStorage.getItem('mtr-learn-applied') !== '0'; } catch (_) { state.learnApplied = true; }
+el.learnApplied.checked = state.learnApplied;
+try { state.onlyNew = localStorage.getItem('mtr-only-new') !== '0'; } catch (_) { state.onlyNew = true; }
+el.onlyNew.checked = state.onlyNew;
+try { state.watchNew = localStorage.getItem('mtr-watch-new') !== '0'; } catch (_) { state.watchNew = true; }
+el.watchNew.checked = state.watchNew;
+renderLearnPanel();
+initTraining()
+    .catch(err => { console.warn(err); renderLearnPanel(); })
+    .then(() => restoreWorkDir())
+    .catch(err => console.warn('No se pudo abrir la última carpeta', err))
+    .finally(() => startWatch());
+</script>
+</body>
+</html>
